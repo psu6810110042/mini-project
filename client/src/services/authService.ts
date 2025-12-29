@@ -1,19 +1,32 @@
 import axios from 'axios';
 
-// URL ของ Backend (เตรียมไว้สำหรับตอนเชื่อมจริง)
-const API_URL = 'http://localhost:3000';
+// ✅ ปล่อยว่างไว้ (เพื่อให้ Vite Proxy ทำงาน)
+const API_URL = ''; 
 
-export const registerService = async (email: string, password: string) => {
+// ฟังก์ชันสมัครสมาชิก (ของเดิมที่คุณมี)
+export const registerService = async (username: string, password: string) => {
   try {
-    // ยิงไปที่ Endpoint /users หรือ /auth/register (แล้วแต่ Backend จะออกแบบ)
-    // ตอนนี้เขียนโค้ดเตรียมไว้ก่อน
-    const response = await axios.post(`${API_URL}/users/register`, {
-      email,
-      password
+    const response = await axios.post(`${API_URL}/api/auth/register`, { 
+      username: username, 
+      password: password
     });
     return response.data;
   } catch (error: any) {
-    // ถ้า error ให้โยนข้อความออกไป เพื่อให้หน้าเว็บแสดง Alert
     throw new Error(error.response?.data?.message || 'การสมัครสมาชิกผิดพลาด');
+  }
+};
+
+// 👇👇 เพิ่มฟังก์ชัน Login ตรงนี้ครับ 👇👇
+export const loginService = async (username: string, password: string) => {
+  try {
+    // ยิงไปที่ Endpoint Login ของ Backend
+    const response = await axios.post(`${API_URL}/api/auth/login`, {
+      username: username, 
+      password: password
+    });
+    return response.data;
+  } catch (error: any) {
+    // ถ้า Login ไม่ผ่าน ให้ส่งข้อความ Error กลับไป
+    throw new Error(error.response?.data?.message || 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
   }
 };

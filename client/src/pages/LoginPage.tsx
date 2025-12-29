@@ -1,88 +1,92 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { AuthResponse } from '../types';
-
+// นำเข้า loginService จากไฟล์ที่เราเพิ่งแก้เมื่อกี้
+import { loginService } from '../services/authService'; 
 
 const LoginPage = () => {
   const navigate = useNavigate();
 
-  // 1. Strict State Typing
-  const [email, setEmail] = useState<string>('');
+  // 1. เปลี่ยน State จาก email เป็น username
+  const [username, setUsername] = useState<string>('');
   const [password, setPassword] = useState<string>('');
+  const [error, setError] = useState<string | null>(null);
 
-  // 2. Strict Event Typing: สำหรับ Input (ChangeEvent)
-  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setEmail(e.target.value);
+  // 2. Event Handler สำหรับ Username
+  const handleUsernameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setUsername(e.target.value);
   };
 
   const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setPassword(e.target.value);
   };
 
-  // 3. Strict Event Typing: สำหรับ Form Submit (FormEvent)
+  // 3. ฟังก์ชัน Submit (เชื่อมต่อกับ Backend จริง)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null); // เคลียร์ error เก่าก่อน
 
     try {
-      // --- จำลอง API Call (Mock) ---
-      console.log('Logging in with:', email, password);
-      
-      // สมมติ Backend ส่งข้อมูลกลับมาแบบนี้ (ตาม Interface AuthResponse)
-      const mockResponse: AuthResponse= {
-        accessToken: "mock-jwt-token-123456",
-        user: {
-          uid: "admin1",
-          email: email,
-          role: "admin", // หรือลองเปลี่ยนเป็น 'admin' เพื่อเทส
-          lastOnline: new Date().toISOString()
-        }
-      };
+      console.log('Logging in with:', username);
 
-      // --- 4. Logic เก็บ JWT ลง Local Storage (ตามโจทย์) ---
-      localStorage.setItem('token', mockResponse.accessToken);
-      // เก็บ User ไว้ด้วยเพื่อเอาไปเช็ค Role (User/Admin)
-      localStorage.setItem('user', JSON.stringify(mockResponse.user));
-
-      navigate('/dashboard');
+      // ✅ เรียก API จริง ผ่าน loginService
+      const data = await loginService(username, password);
       
-      // Redirect ตาม Role (Logic เบื้องต้น)
-      if (mockResponse.user.role === 'admin') {
-         // navigate('/admin'); // (ถ้ามีหน้า Admin)
-         console.log("Go to Admin View");
-      } else {
-         // navigate('/dashboard'); // (ไปหน้า User View)
-         console.log("Go to User View");
+      console.log('Login Success:', data);
+
+      // ✅ เก็บ Token ลง LocalStorage (NestJS มักส่งกลับมาเป็น key ชื่อ access_token)
+      if (data.access_token) {
+        localStorage.setItem('token', data.access_token);
+      } else if (data.accessToken) {
+        // เผื่อ Backend ส่ง key มาชื่อ accessToken
+        localStorage.setItem('token', data.accessToken);
       }
 
-    } catch (error) {
-      alert('Login ผิดพลาด');
+      alert('เข้าสู่ระบบสำเร็จ!');
+      navigate('/'); // เด้งไปหน้า Dashboard หรือหน้าแรก
+
+    } catch (err: any) {
+      // แสดง Error ที่ได้จาก Backend
+      setError(err.message);
+      // alert('Login ผิดพลาด: ' + err.message);
     }
   };
 
   return (
-    <div className="login-container">
-      <h2>Login</h2>
+    <div className="login-container" style={{ maxWidth: '400px', margin: '50px auto', padding: '20px', border: '1px solid #ccc', borderRadius: '8px' }}>
+      <h2 style={{ textAlign: 'center' }}>Login</h2>
+      
+      {/* แสดง Error message ถ้ามี */}
+      {error && <p style={{ color: 'red', textAlign: 'center' }}>{error}</p>}
+
       <form onSubmit={handleSubmit}>
-        <div>
-          <label>Email:</label>
+        <div style={{ marginBottom: '15px' }}>
+          {/* ✅ เปลี่ยน Label และ Input เป็น Username */}
+          <label>Username:</label>
           <input 
-            type="email" 
-            value={email} 
-            onChange={handleEmailChange} // ✅ Type ถูกต้อง
+            type="text" 
+            value={username} 
+            onChange={handleUsernameChange} 
             required 
+            placeholder="กรอกชื่อผู้ใช้"
+            style={{ width: '100%', padding: '8px', marginTop: '5px' }}
           />
         </div>
-        <div>
+        <div style={{ marginBottom: '15px' }}>
           <label>Password:</label>
           <input 
             type="password" 
             value={password} 
-            onChange={handlePasswordChange} // ✅ Type ถูกต้อง
+            onChange={handlePasswordChange} 
             required 
+            placeholder="กรอกรหัสผ่าน"
+            style={{ width: '100%', padding: '8px', marginTop: '5px' }}
           />
         </div>
-        <button type="submit">เข้าสู่ระบบ</button>
+        <button type="submit" style={{ width: '100%', padding: '10px', backgroundColor: '#007bff', color: 'white', border: 'none', cursor: 'pointer' }}>
+          เข้าสู่ระบบ
+        </button>
       </form>
+
       <p style={{ marginTop: '15px', textAlign: 'center', fontSize: '14px' }}>
         ยังไม่มีบัญชี?{' '}
         <span 

@@ -20,7 +20,9 @@ export interface CodeSnippet {
   visibility: boolean;   
   createdBy: string;     
   createdDate: string;
-  lastModified: string;    
+  lastModified: string;
+  likes: number;        // จำนวน like
+  likedBy: string[];    // เก็บ UID ของคนที่กด Like ไปแล้ว (array ของ string)
   tags: Tag[];           
   owner?: User;          
 }
