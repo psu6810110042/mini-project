@@ -1,5 +1,5 @@
 import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
-import { Snippet } from 'src/snippets/entities/snippet.entity';
+import { Snippet } from '../../snippets/entities/snippet.entity';
 import { Exclude } from 'class-transformer';
 
 export enum UserRole {

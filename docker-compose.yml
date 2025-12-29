@@ -40,7 +40,6 @@ services:
     networks:
       - nestbin-network-dev
       
-
   client:
     build:
       context: ./client
@@ -50,14 +49,18 @@ services:
     ports:
       - '5173:5173'
     volumes:
-      # Mount source code for hot reload
       - ./client/src:/app/src
+      - ./client/public:/app/public          # Added
+      - ./client/index.html:/app/index.html  # Added
       - ./client/tsconfig.json:/app/tsconfig.json
       - ./client/tsconfig.app.json:/app/tsconfig.app.json
       - ./client/vite.config.ts:/app/vite.config.ts
-
     environment:
       - VITE_API_URL=http://localhost:3000
+    depends_on:
+      - server
+    networks:
+      - nestbin-network-dev
 
 volumes:
   postgres_data:
