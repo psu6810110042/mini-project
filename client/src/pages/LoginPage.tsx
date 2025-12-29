@@ -31,14 +31,21 @@ const LoginPage = () => {
       // ✅ เรียก API จริง ผ่าน loginService
       const data = await loginService(username, password);
       
-      console.log('Login Success:', data);
+      console.log('Login Success:', data); // ดูใน Console ว่า data หน้าตาเป็นยังไง
 
-      // ✅ เก็บ Token ลง LocalStorage (NestJS มักส่งกลับมาเป็น key ชื่อ access_token)
+      // ✅ 1. เก็บ Token ลง LocalStorage
       if (data.access_token) {
         localStorage.setItem('token', data.access_token);
       } else if (data.accessToken) {
-        // เผื่อ Backend ส่ง key มาชื่อ accessToken
         localStorage.setItem('token', data.accessToken);
+      }
+
+      // ✅ 2. เก็บข้อมูล User ลง LocalStorage (สำคัญมาก! Dashboard ต้องใช้)
+      if (data.user) {
+        // แปลง Object เป็น String ก่อนเก็บ
+        localStorage.setItem('user', JSON.stringify(data.user));
+      } else {
+        console.warn("⚠️ Backend ไม่ได้ส่งข้อมูล user กลับมา อาจทำให้ Dashboard แสดงผลผิดพลาด");
       }
 
       alert('เข้าสู่ระบบสำเร็จ!');
@@ -46,8 +53,7 @@ const LoginPage = () => {
 
     } catch (err: any) {
       // แสดง Error ที่ได้จาก Backend
-      setError(err.message);
-      // alert('Login ผิดพลาด: ' + err.message);
+      setError(err.message || 'เกิดข้อผิดพลาดในการเข้าสู่ระบบ');
     }
   };
 

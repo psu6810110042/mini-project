@@ -1,68 +1,52 @@
+import axios from 'axios';
 import type { CodeSnippet } from "../types";
 
+const API_URL = ''; // ให้ Proxy ทำงาน
 
-// Mock Data เพิ่ม likes และ likedBy
-let MOCK_CODES: CodeSnippet[] = [
-  {
-    codeId: 101,
-    title: "วิธีใช้ React Hooks เบื้องต้น",
-    content: "const [count, setCount] = useState(0);",
-    visibility: true,
-    createdBy: "u001",
-    lastModified: "2023-10-01",
-    createdDate: "2023-10-01",
-    tags: [{ tagId: 1, tagName: "React" }],
-    likes: 10,              // มีคนกดไลก์แล้ว 10 คน
-    likedBy: ["u999"]       // สมมติมี user อื่นกดไปแล้ว
-  },
-  {
-    codeId: 102,
-    title: "NestJS Controller Example",
-    content: "@Controller('cats') export class CatsController { ... }",
-    visibility: true,
-    createdBy: "u002",
-    lastModified: "2023-10-02",
-    createdDate: "2023-10-02",
-    tags: [{ tagId: 3, tagName: "NestJS" }],
-    likes: 0,
-    likedBy: []
-  }
-];
+const getAuthHeaders = () => {
+  const token = localStorage.getItem('token');
+  return {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  };
+};
 
+// 1. ดึงข้อมูลทั้งหมด
 export const getCodes = async (): Promise<CodeSnippet[]> => {
-  await new Promise(resolve => setTimeout(resolve, 500));
-  return [...MOCK_CODES]; // ส่ง Copy กลับไป
+  try {
+    const response = await axios.get(`${API_URL}/api/snippets`, getAuthHeaders());
+    return response.data;
+  } catch (error) {
+    console.error("Fetch error:", error);
+    return [];
+  }
 };
 
-// จำลองการกด Like
-export const likeCodeService = async (codeId: number, userId: string): Promise<CodeSnippet | null> => {
-    // หา Code ตัวนั้น
-    const index = MOCK_CODES.findIndex(c => c.codeId === codeId);
-    if (index === -1) return null;
-
-    // เช็คว่าเคยกดไปยัง
-    const code = MOCK_CODES[index];
-    if (code.likedBy.includes(userId)) {
-        throw new Error("คุณกด Like ไปแล้ว!");
-    }
-
-    // อัปเดตข้อมูล
-    code.likes += 1;
-    code.likedBy.push(userId);
-    
-    return code;
+// 2. ✅ สร้าง Code ใหม่ (Create)
+export const createCodeService = async (data: { 
+  title: string, 
+  content: string, 
+  language: string, 
+  visibility: 'PUBLIC' | 'PRIVATE',
+  tags: string[] 
+}) => {
+  const response = await axios.post(`${API_URL}/api/snippets`, data, getAuthHeaders());
+  return response.data;
 };
 
-// จำลองการแก้ไข Code
-export const updateCodeService = async (codeId: number, newTitle: string, newContent: string) => {
-    const index = MOCK_CODES.findIndex(c => c.codeId === codeId);
-    if (index !== -1) {
-        MOCK_CODES[index].title = newTitle;
-        MOCK_CODES[index].content = newContent;
-    }
+// 3. กด Like (Toggle)
+export const likeCodeService = async (id: string): Promise<void> => {
+  // Backend ใช้ POST /api/snippets/:id/like
+  await axios.post(`${API_URL}/api/snippets/${id}/like`, {}, getAuthHeaders());
 };
 
-// จำลองการลบ Code
-export const deleteCodeService = async (codeId: number) => {
-    MOCK_CODES = MOCK_CODES.filter(c => c.codeId !== codeId);
+// 4. แก้ไข Code
+export const updateCodeService = async (id: string, data: Partial<CodeSnippet>) => {
+  await axios.patch(`${API_URL}/api/snippets/${id}`, data, getAuthHeaders());
+};
+
+// 5. ลบ Code
+export const deleteCodeService = async (id: string) => {
+  await axios.delete(`${API_URL}/api/snippets/${id}`, getAuthHeaders());
 };

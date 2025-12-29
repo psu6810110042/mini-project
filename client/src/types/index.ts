@@ -1,34 +1,34 @@
-// ... (User Interface เดิมที่มีอยู่แล้ว)
+// Types ให้ตรงกับ Backend Entity
+
 export interface User {
-  uid: string;
-  email: string;
-  role: 'admin' | 'user';
-  lastOnline: string;
+  id: number;          // Backend User ID เป็น number
+  username: string;    // Backend ใช้ username
+  role: 'ADMIN' | 'USER'; // Backend เป็น Enum
 }
 
-// ... (Tag Interface เดิมที่มีอยู่แล้ว)
 export interface Tag {
-  tagId: number;
-  tagName: string;
+  id: number;
+  name: string;
 }
 
-// 👇👇 ส่วนที่ขาดหายไป คือส่วนนี้ครับ! 👇👇
 export interface CodeSnippet {
-  codeId: number;        
-  title: string;         
-  content: string;       
-  visibility: boolean;   
-  createdBy: string;     
-  createdDate: string;
-  lastModified: string;
-  likes: number;        // จำนวน like
-  likedBy: string[];    // เก็บ UID ของคนที่กด Like ไปแล้ว (array ของ string)
-  tags: Tag[];           
-  owner?: User;          
+  id: string;          // ✅ Backend ใช้ NanoID (String)
+  title: string;
+  content: string;
+  language: string;    // ✅ มี field นี้เพิ่มมา
+  visibility: 'PUBLIC' | 'PRIVATE'; // ✅ Backend ใช้ Enum
+  
+  author: User;        // ✅ Backend ส่งมาทั้ง Object User
+  authorId: number;
+
+  likes: User[];       // ✅ Array ของ User ที่กดไลก์
+  tags: Tag[];
+  
+  createdAt: string;
+  updatedAt: string;
 }
 
-// ... (AuthResponse เดิมที่มีอยู่แล้ว)
 export interface AuthResponse {
-  accessToken: string;
+  access_token: string; // NestJS มักใช้ access_token
   user: User;
 }
