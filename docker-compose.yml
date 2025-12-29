@@ -1,0 +1,43 @@
+version: '3.8'
+services:
+  db:
+    image: postgres:15-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: adminkhet
+      POSTGRES_PASSWORD: khetgamerthailand
+      POSTGRES_DB: nestbin
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  server:
+    build: ./server
+    ports:
+      - '3000:3000'
+    volumes:
+      - ./server:/app
+      - /app/node_modules # Prevents host node_modules from overriding container's
+    environment:
+      # Use the SERVICE NAME 'db' as the host, not localhost
+      DB_HOST: db 
+      DB_PORT: 5432
+      DB_USER: adminkhet
+      DB_PASS: khetgamerthailand
+      DB_NAME: nestbin
+    depends_on:
+      - db
+
+  client:
+    build: ./client
+    ports:
+      - '5173:5173'
+    volumes:
+      - ./client:/app
+      - /app/node_modules
+    environment:
+      - VITE_API_URL=http://localhost:3000
+
+volumes:
+  postgres_data:
