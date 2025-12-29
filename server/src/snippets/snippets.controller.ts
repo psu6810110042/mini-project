@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, UseGuards, Request, Patch, Delete } from '@nestjs/common';
 import { SnippetsService } from './snippets.service';
 import { CreateSnippetDto } from './dto/create-snippet.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -11,14 +11,36 @@ export class SnippetsController {
   @UseGuards(JwtAuthGuard)
   @Post()
   create(@Request() req, @Body() createDto: CreateSnippetDto) {
-    // req.user comes from JwtStrategy
     return this.snippetsService.create(createDto, req.user);
   }
 
-  // Use a custom guard that allows guest access but attaches user if token exists
   @UseGuards(OptionalJwtAuthGuard) 
   @Get(':id')
   findOne(@Request() req, @Param('id') id: string) {
     return this.snippetsService.findOne(id, req.user);
+  }
+
+  @UseGuards(OptionalJwtAuthGuard)
+  @Get()
+  findAll(@Request() req) {
+    return this.snippetsService.findAll(req.user);
+  }
+
+  @UseGuards(JwtAuthGuard) // Must be logged in to edit/delete
+  @Patch(':id')
+  update(@Param('id') id: string, @Body() updateDto: any, @Request() req) {
+    return this.snippetsService.update(id, updateDto, req.user);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Delete(':id')
+  remove(@Param('id') id: string, @Request() req) {
+    return this.snippetsService.remove(id, req.user);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post(':id/like')
+  like(@Param('id') id: string, @Request() req) {
+    return this.snippetsService.toggleLike(id, req.user);
   }
 }

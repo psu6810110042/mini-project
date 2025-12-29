@@ -1,4 +1,4 @@
-import { Entity, PrimaryColumn, Column, ManyToOne, ManyToMany, JoinTable, CreateDateColumn } from 'typeorm';
+import { Entity, PrimaryColumn, Column, ManyToOne, ManyToMany, JoinTable, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
 import { Tag } from '../../tags/entities/tag.entity';
 
@@ -6,6 +6,9 @@ import { Tag } from '../../tags/entities/tag.entity';
 export class Snippet {
   @PrimaryColumn()
   id: string; // NanoID
+
+  @Column() 
+  title: string;
 
   @Column('text')
   content: string;
@@ -15,9 +18,6 @@ export class Snippet {
 
   @Column({ default: 'PUBLIC' })
   visibility: 'PUBLIC' | 'PRIVATE';
-
-  @CreateDateColumn()
-  createdAt: Date;
 
   // 1:N Relation
   @ManyToOne(() => User, (user) => user.snippets)
@@ -30,4 +30,14 @@ export class Snippet {
   @ManyToMany(() => Tag, (tag) => tag.snippets, { cascade: ['insert'] })
   @JoinTable()
   tags: Tag[];
+
+  @ManyToMany(() => User, { cascade: true })
+  @JoinTable() 
+  likes: User[];
+
+  @CreateDateColumn()
+  createdAt: Date;
+
+  @UpdateDateColumn()
+  updatedAt: Date;
 }
