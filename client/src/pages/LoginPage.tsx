@@ -31,9 +31,9 @@ const LoginPage = () => {
       const mockResponse: AuthResponse= {
         accessToken: "mock-jwt-token-123456",
         user: {
-          uid: "u001",
+          uid: "admin1",
           email: email,
-          role: "user", // หรือลองเปลี่ยนเป็น 'admin' เพื่อเทส
+          role: "admin", // หรือลองเปลี่ยนเป็น 'admin' เพื่อเทส
           lastOnline: new Date().toISOString()
         }
       };
