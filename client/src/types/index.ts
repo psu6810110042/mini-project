@@ -19,8 +19,8 @@ export interface CodeSnippet {
   content: string;       
   visibility: boolean;   
   createdBy: string;     
-  lastModified: string;  
-  creationDate: string;  
+  createdDate: string;
+  lastModified: string;    
   tags: Tag[];           
   owner?: User;          
 }

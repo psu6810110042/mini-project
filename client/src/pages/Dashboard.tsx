@@ -85,6 +85,7 @@ const Dashboard = () => {
           </div>
           <pre style={{ backgroundColor: '#f4f4f4', padding: '10px', overflowX: 'auto' , color: 'black' }}><code>{item.content}</code></pre>
           <p style={{ fontSize: '12px', color: '#666' }}>By User: {item.createdBy}</p>
+          <p style ={{ fontSize: '12px', color: '#666' }}>Creation Date:{item.createdDate}</p>
 
           <div style={{ marginTop: '10px' }}>
             <button onClick={() => alert(`Liked code ${item.codeId}`)} style={{ marginRight: '10px' }}>

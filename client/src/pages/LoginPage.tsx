@@ -33,7 +33,7 @@ const LoginPage = () => {
         user: {
           uid: "u001",
           email: email,
-          role: "admin", // หรือลองเปลี่ยนเป็น 'admin' เพื่อเทส
+          role: "user", // หรือลองเปลี่ยนเป็น 'admin' เพื่อเทส
           lastOnline: new Date().toISOString()
         }
       };

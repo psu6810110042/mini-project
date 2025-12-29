@@ -9,8 +9,8 @@ const MOCK_CODES: CodeSnippet[] = [
     content: "const [count, setCount] = useState(0);",
     visibility: true,
     createdBy: "u001",
+    createdDate : "22/12/2025",
     lastModified: "2023-10-01",
-    creationDate: "2023-10-01",
     tags: [{ tagId: 1, tagName: "React" }, { tagId: 2, tagName: "Frontend" }]
   },
   {
@@ -19,8 +19,8 @@ const MOCK_CODES: CodeSnippet[] = [
     content: "@Controller('cats') export class CatsController { ... }",
     visibility: true,
     createdBy: "u002",
+    createdDate : "24/12/2025",
     lastModified: "2023-10-02",
-    creationDate: "2023-10-02",
     tags: [{ tagId: 3, tagName: "NestJS" }, { tagId: 4, tagName: "Backend" }]
   }
 ];
