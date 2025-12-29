@@ -83,6 +83,15 @@ const LoginPage = () => {
         </div>
         <button type="submit">เข้าสู่ระบบ</button>
       </form>
+      <p style={{ marginTop: '15px', textAlign: 'center', fontSize: '14px' }}>
+        ยังไม่มีบัญชี?{' '}
+        <span 
+          onClick={() => navigate('/register')} 
+          style={{ color: 'blue', cursor: 'pointer', textDecoration: 'underline' }}
+        >
+          สมัครสมาชิก
+        </span>
+      </p>
     </div>
   );
 };
