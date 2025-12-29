@@ -1,7 +1,6 @@
 import { Routes, Route } from 'react-router-dom';
 import LoginPage from './pages/LoginPage';
-import Dashboard from './pages/DashBoard';
-
+import Dashboard from './pages/Dashboard';
 
 function App() {
   return (
