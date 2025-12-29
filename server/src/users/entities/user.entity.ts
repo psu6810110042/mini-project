@@ -17,13 +17,12 @@ export class User {
 
   @Column()
   @Exclude()
-  password: string; // This will be hashed!
+  password: string;
 
   @Column({ type: 'enum', enum: UserRole, default: UserRole.USER })
   @Exclude()
   role: UserRole;
 
-  // Placeholder for relation
   @OneToMany(() => Snippet, (snippet) => snippet.author)
   snippets: Snippet[];
 }
