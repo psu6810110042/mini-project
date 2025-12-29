@@ -1,6 +1,11 @@
-import { IsNotEmpty, IsString, IsEnum, IsArray, IsOptional } from 'class-validator';
+import { IsNotEmpty, IsString, IsEnum, IsArray, IsOptional, MaxLength } from 'class-validator';
 
-export class CreateSnippetDto {
+export class CreateSnippetDto{
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(100) // Good practice to limit titles
+  title: string;  // <--- ADD THIS
+
   @IsString()
   @IsNotEmpty()
   content: string;
