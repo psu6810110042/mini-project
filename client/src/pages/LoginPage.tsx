@@ -1,107 +1,138 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-// นำเข้า loginService จากไฟล์ที่เราเพิ่งแก้เมื่อกี้
-import { loginService } from '../services/authService'; 
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Form, Input, Button, Card, Typography, Alert, message } from "antd";
+import { UserOutlined, LockOutlined } from "@ant-design/icons";
+import { loginService } from "../services/authService";
 
-const LoginPage = () => {
+const { Title, Text } = Typography;
+
+const LoginPage: React.FC = () => {
   const navigate = useNavigate();
-
-  // 1. เปลี่ยน State จาก email เป็น username
-  const [username, setUsername] = useState<string>('');
-  const [password, setPassword] = useState<string>('');
+  const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  // 2. Event Handler สำหรับ Username
-  const handleUsernameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setUsername(e.target.value);
-  };
-
-  const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setPassword(e.target.value);
-  };
-
-  // 3. ฟังก์ชัน Submit (เชื่อมต่อกับ Backend จริง)
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null); // เคลียร์ error เก่าก่อน
+  // Ant Design handles state automatically, we receive 'values' here
+  const onFinish = async (values: any) => {
+    setLoading(true);
+    setError(null);
 
     try {
-      console.log('Logging in with:', username);
+      console.log("Logging in with:", values.username);
 
-      // ✅ เรียก API จริง ผ่าน loginService
-      const data = await loginService(username, password);
-      
-      console.log('Login Success:', data); // ดูใน Console ว่า data หน้าตาเป็นยังไง
+      // ✅ Call API
+      const data = await loginService(values.username, values.password);
+      console.log("Login Success:", data);
 
-      // ✅ 1. เก็บ Token ลง LocalStorage
+      // ✅ 1. Store Token
       if (data.access_token) {
-        localStorage.setItem('token', data.access_token);
+        localStorage.setItem("token", data.access_token);
       } else if (data.accessToken) {
-        localStorage.setItem('token', data.accessToken);
+        localStorage.setItem("token", data.accessToken);
       }
 
-      // ✅ 2. เก็บข้อมูล User ลง LocalStorage (สำคัญมาก! Dashboard ต้องใช้)
+      // ✅ 2. Store User Data
       if (data.user) {
-        // แปลง Object เป็น String ก่อนเก็บ
-        localStorage.setItem('user', JSON.stringify(data.user));
+        localStorage.setItem("user", JSON.stringify(data.user));
       } else {
-        console.warn("⚠️ Backend ไม่ได้ส่งข้อมูล user กลับมา อาจทำให้ Dashboard แสดงผลผิดพลาด");
+        console.warn("⚠️ Backend user data missing");
       }
 
-      alert('เข้าสู่ระบบสำเร็จ!');
-      navigate('/'); // เด้งไปหน้า Dashboard หรือหน้าแรก
-
+      // ✅ Success Feedback
+      message.success("Login successful!");
+      navigate("/");
+      
     } catch (err: any) {
-      // แสดง Error ที่ได้จาก Backend
-      setError(err.message || 'เกิดข้อผิดพลาดในการเข้าสู่ระบบ');
+      // ✅ Error Feedback
+      const errorMessage = err.message || "Login failed. Please try again.";
+      setError(errorMessage);
+      message.error(errorMessage);
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="login-container" style={{ maxWidth: '400px', margin: '50px auto', padding: '20px', border: '1px solid #ccc', borderRadius: '8px' }}>
-      <h2 style={{ textAlign: 'center' }}>Login</h2>
-      
-      {/* แสดง Error message ถ้ามี */}
-      {error && <p style={{ color: 'red', textAlign: 'center' }}>{error}</p>}
-
-      <form onSubmit={handleSubmit}>
-        <div style={{ marginBottom: '15px' }}>
-          {/* ✅ เปลี่ยน Label และ Input เป็น Username */}
-          <label>Username:</label>
-          <input 
-            type="text" 
-            value={username} 
-            onChange={handleUsernameChange} 
-            required 
-            placeholder="กรอกชื่อผู้ใช้"
-            style={{ width: '100%', padding: '8px', marginTop: '5px' }}
-          />
+    <div
+      style={{
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        minHeight: "100vh",
+      }}
+    >
+      <Card
+        style={{ width: 400, boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }}
+        bordered={false}
+      >
+        <div style={{ textAlign: "center", marginBottom: 24 }}>
+          <Title level={2}>Welcome Back</Title>
+          <Text type="secondary">Please login to your account</Text>
         </div>
-        <div style={{ marginBottom: '15px' }}>
-          <label>Password:</label>
-          <input 
-            type="password" 
-            value={password} 
-            onChange={handlePasswordChange} 
-            required 
-            placeholder="กรอกรหัสผ่าน"
-            style={{ width: '100%', padding: '8px', marginTop: '5px' }}
-          />
-        </div>
-        <button type="submit" style={{ width: '100%', padding: '10px', backgroundColor: '#007bff', color: 'white', border: 'none', cursor: 'pointer' }}>
-          เข้าสู่ระบบ
-        </button>
-      </form>
 
-      <p style={{ marginTop: '15px', textAlign: 'center', fontSize: '14px' }}>
-        ยังไม่มีบัญชี?{' '}
-        <span 
-          onClick={() => navigate('/register')} 
-          style={{ color: 'blue', cursor: 'pointer', textDecoration: 'underline' }}
+        {/* Show Error Alert if exists */}
+        {error && (
+          <Alert
+            message="Error"
+            description={error}
+            type="error"
+            showIcon
+            closable
+            onClose={() => setError(null)}
+            style={{ marginBottom: 16 }}
+          />
+        )}
+
+        <Form
+          name="login_form"
+          initialValues={{ remember: true }}
+          onFinish={onFinish}
+          layout="vertical"
+          size="large"
         >
-          สมัครสมาชิก
-        </span>
-      </p>
+          {/* Username Input */}
+          <Form.Item
+            name="username"
+            rules={[{ required: true, message: "Please input your Username!" }]}
+          >
+            <Input 
+              prefix={<UserOutlined className="site-form-item-icon" />} 
+              placeholder="Username" 
+            />
+          </Form.Item>
+
+          {/* Password Input */}
+          <Form.Item
+            name="password"
+            rules={[{ required: true, message: "Please input your Password!" }]}
+          >
+            <Input.Password
+              prefix={<LockOutlined className="site-form-item-icon" />}
+              placeholder="Password"
+            />
+          </Form.Item>
+
+          {/* Submit Button */}
+          <Form.Item>
+            <Button
+              type="primary"
+              htmlType="submit"
+              className="login-form-button"
+              block
+              loading={loading} // Shows spinner while fetching
+            >
+              Log in
+            </Button>
+          </Form.Item>
+        </Form>
+
+        {/* Register Link */}
+        <div style={{ textAlign: "center" }}>
+          <Text>Don't have an account? </Text>
+          <a onClick={() => navigate("/register")} style={{ color: "#1890ff" }}>
+            Register now!
+          </a>
+        </div>
+      </Card>
     </div>
   );
 };
