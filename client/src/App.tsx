@@ -6,6 +6,7 @@ import { BulbOutlined, BulbFilled } from "@ant-design/icons";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import Dashboard from "./pages/Dashboard";
+import AdminPanel from "./pages/AdminPanel";
 
 function App() {
   // 1. Initialize State from LocalStorage (Fixes "Doesn't Save")
@@ -49,7 +50,7 @@ function App() {
       <Layout style={{ minHeight: "100vh", background: 'transparent' }}>
         
         {/* Toggle Button */}
-        <div style={{ position: "fixed", top: 20, right: 20, zIndex: 1000 }}>
+        <div style={{ position: "fixed", bottom: 20, right: 20, zIndex: 1000 }}>
           <Button
             shape="circle"
             icon={isDarkMode ? <BulbFilled /> : <BulbOutlined />}
@@ -63,7 +64,8 @@ function App() {
           <Route path="/snippet/:id" element={<Dashboard />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
-          <Route path="*" element={<Navigate to="/login" replace />} />
+          <Route path="/admin" element={<AdminPanel />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
 
       </Layout>

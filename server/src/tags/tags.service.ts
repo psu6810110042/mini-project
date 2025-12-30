@@ -1,26 +1,43 @@
 import { Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Tag } from './entities/tag.entity';
 import { CreateTagDto } from './dto/create-tag.dto';
 import { UpdateTagDto } from './dto/update-tag.dto';
 
 @Injectable()
 export class TagsService {
-  create(createTagDto: CreateTagDto) {
-    return 'This action adds a new tag';
+  constructor(
+    @InjectRepository(Tag)
+    private tagRepository: Repository<Tag>,
+  ) {}
+
+  // 1. Create Tag
+  async create(createTagDto: CreateTagDto) {
+    const tag = this.tagRepository.create(createTagDto);
+    return this.tagRepository.save(tag);
   }
 
-  findAll() {
-    return `This action returns all tags`;
+  // 2. Get All Tags (The one you need right now)
+  async findAll() {
+    return this.tagRepository.find({
+      order: { name: 'ASC' } // Sort alphabetically
+    });
   }
 
+  // 3. Get One
   findOne(id: number) {
-    return `This action returns a #${id} tag`;
+    return this.tagRepository.findOneBy({ id });
   }
 
-  update(id: number, updateTagDto: UpdateTagDto) {
-    return `This action updates a #${id} tag`;
+  // 4. Update
+  async update(id: number, updateTagDto: UpdateTagDto) {
+    await this.tagRepository.update(id, updateTagDto);
+    return this.findOne(id);
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} tag`;
+  // 5. Delete
+  async remove(id: number) {
+    return this.tagRepository.delete(id);
   }
 }

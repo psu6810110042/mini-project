@@ -1,6 +1,44 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
+  Layout,
+  Input,
+  Button,
+  Card,
+  Row,
+  Col,
+  Select,
+  Typography,
+  Tag,
+  List,
+  message,
+  Modal,
+  Space,
+  Alert,
+  Divider,
+  Avatar,
+  Empty,
+  theme // 1. Import theme
+} from "antd";
+import {
+  SearchOutlined,
+  PlusOutlined,
+  LogoutOutlined,
+  LoginOutlined,
+  UserOutlined,
+  HeartOutlined,
+  HeartFilled,
+  EditOutlined,
+  DeleteOutlined,
+  GlobalOutlined,
+  LockOutlined,
+  CodeOutlined,
+  FireOutlined,
+  CloseCircleFilled,
+  SafetyCertificateOutlined
+} from "@ant-design/icons";
+
+import {
   getCodes,
   createCodeService,
   likeCodeService,
@@ -8,16 +46,30 @@ import {
   updateCodeService,
 } from "../services/codeService";
 import type { CodeSnippet, User } from "../types";
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus, vs } from 'react-syntax-highlighter/dist/esm/styles/prism';
+
+const { Header, Content } = Layout;
+const { Title, Text } = Typography;
+const { TextArea } = Input;
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const { id } = useParams();
 
+  // 2. Access Design Tokens
+  const { token } = theme.useToken();
+
+  // --- State ---
   const [codes, setCodes] = useState<CodeSnippet[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  // --- Unified State: ใช้ตัวแปรชุดเดียวทั้ง "สร้าง" และ "แก้ไข" ---
-  // แบบนี้จะจัดการง่ายกว่าแยก state ครับ
+  // Search State
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<CodeSnippet[]>([]);
+
+  // Form States
   const [titleInput, setTitleInput] = useState("");
   const [contentInput, setContentInput] = useState("");
   const [langInput, setLangInput] = useState("javascript");
@@ -27,7 +79,8 @@ const Dashboard = () => {
   const [selectedCode, setSelectedCode] = useState<CodeSnippet | null>(null);
   const [isEditing, setIsEditing] = useState(false);
 
-  // 1. Load User
+  // --- Effects ---
+
   useEffect(() => {
     const storedUserStr = localStorage.getItem("user");
     if (storedUserStr) {
@@ -39,85 +92,111 @@ const Dashboard = () => {
     }
   }, []);
 
-  // 2. Load Data & Handle URL ID
   useEffect(() => {
     fetchData();
   }, [id]);
 
-  const fetchData = async () => {
-    const data = await getCodes();
-    if (Array.isArray(data)) {
-      setCodes(data);
+  // Real-time search filtering
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setSearchResults([]);
+      return;
+    }
+    const query = searchQuery.toLowerCase();
+    const filtered = codes.filter(code =>
+      code.title.toLowerCase().includes(query) ||
+      code.language.toLowerCase().includes(query) ||
+      (code.tags && code.tags.some(t => t.name.toLowerCase().includes(query)))
+    );
+    setSearchResults(filtered);
+  }, [searchQuery, codes]);
 
-      // ถ้ามี ID ใน URL ให้เลือก Snippet นั้นมาโชว์
-      if (id) {
-        const foundSnippet = data.find((code) => code.id === id);
-        if (foundSnippet) {
-          handleSelectCode(foundSnippet);
+  // --- Logic ---
+
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const data = await getCodes();
+      if (Array.isArray(data)) {
+        setCodes(data);
+        if (id) {
+          const foundSnippet = data.find((code) => code.id === id);
+          if (foundSnippet) handleSelectCode(foundSnippet);
         }
       }
+    } catch (error) {
+      console.error("Failed to fetch codes");
+    } finally {
+      setLoading(false);
     }
   };
 
+  const trendingCodes = React.useMemo(() => {
+    const oneWeekAgo = new Date();
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+
+    return codes
+      .filter(code => {
+        // Must be Public AND created in the last 7 days
+        const created = new Date(code.createdAt);
+        return code.visibility === 'PUBLIC' && created > oneWeekAgo;
+      })
+      .sort((a, b) => {
+        // Sort by Likes (Highest first)
+        // If likes are equal, sort by newest
+        if (b.likes.length !== a.likes.length) {
+          return b.likes.length - a.likes.length;
+        }
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      })
+      .slice(0, 5); // Top 5 only
+  }, [codes]);
+
   const handleLogout = () => {
     localStorage.clear();
-    navigate("/login");
+    message.success("Logged out successfully");
+    navigate("/dashboard");
   };
 
-  // --- Helpers ---
-
-  // รีเซ็ตฟอร์มกลับไปหน้า "Create New Paste"
   const resetToCreateMode = () => {
     setSelectedCode(null);
     setIsEditing(false);
-    // เคลียร์ค่า Input
     setTitleInput("");
     setContentInput("");
     setLangInput("javascript");
     setVisibilityInput("PUBLIC");
     setTagsInput("");
-    navigate("/"); // ลบ ID ออกจาก URL
+    setSearchQuery("");
+    navigate("/");
   };
 
-  // เตรียมข้อมูลลงฟอร์มเมื่อกด "Edit"
   const startEditMode = () => {
     if (!selectedCode) return;
     setIsEditing(true);
-
-    // ✅ ดึงค่าเก่ามาใส่ Input (แก้ปัญหาแก้ไขไม่ได้)
     setTitleInput(selectedCode.title);
     setContentInput(selectedCode.content);
     setLangInput(selectedCode.language);
     setVisibilityInput(selectedCode.visibility);
-
-    // ✅ แปลง Tags Object Array -> String (เช่น "react, js") เพื่อโชว์ใน Input
-    const tagsString = selectedCode.tags
-      ? selectedCode.tags.map((t) => t.name).join(", ")
-      : "";
-    setTagsInput(tagsString);
+    setTagsInput(selectedCode.tags ? selectedCode.tags.map((t) => t.name).join(", ") : "");
   };
 
   const handleSelectCode = (code: CodeSnippet) => {
     setSelectedCode(code);
     setIsEditing(false);
+    setSearchQuery("");
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  // --- Actions ---
+  // --- API Actions ---
 
   const handleCreate = async () => {
-    if (!contentInput) return alert("กรุณาใส่เนื้อหา Code");
+    if (!contentInput) return message.warning("Please enter some code content!");
 
     const titleToSend = currentUser ? titleInput || "Untitled" : "Untitled";
     const langToSend = currentUser ? langInput : "text";
 
     try {
-      // แปลง String -> Array
-      const tagsArray = tagsInput
-        .split(",")
-        .map((t) => t.trim())
-        .filter((t) => t !== "");
-
+      const tagsArray = tagsInput.split(",").map((t) => t.trim()).filter((t) => t !== "");
       await createCodeService({
         title: titleToSend,
         content: contentInput,
@@ -126,599 +205,446 @@ const Dashboard = () => {
         tags: tagsArray,
       });
 
+      message.success("Paste created successfully!");
       resetToCreateMode();
       fetchData();
-      alert("Paste created successfully!");
     } catch (err: any) {
-      alert("Error: " + err.message);
+      message.error(err.message || "Failed to create paste");
     }
   };
 
   const handleUpdate = async () => {
     if (!selectedCode) return;
     try {
-      // แปลง String -> Array สำหรับอัปเดต
-      const tagsArray = tagsInput
-        .split(",")
-        .map((t) => t.trim())
-        .filter((t) => t !== "");
+      const tagsArray = tagsInput.split(",").map((t) => t.trim()).filter((t) => t !== "");
 
-      // ✅ ส่งครบทุก field (แก้ปัญหาอัปเดตได้ไม่ครบ)
       await updateCodeService(selectedCode.id, {
         title: titleInput,
         content: contentInput,
         language: langInput,
         visibility: visibilityInput,
-        tags: tagsArray, 
+        tags: tagsArray,
       });
 
+      message.success("Paste updated!");
+      const freshData = await getCodes();
+      setCodes(freshData);
+      const updatedItem = freshData.find(c => c.id === selectedCode.id);
+      if (updatedItem) setSelectedCode(updatedItem);
       setIsEditing(false);
-      fetchData(); 
-      alert("Updated!");
     } catch (err) {
-      alert("Update failed");
+      console.error(err);
+      message.error("Update failed");
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Delete this paste?")) return;
-    try {
-      await deleteCodeService(id);
-      resetToCreateMode();
-      fetchData();
-    } catch (err) {
-      alert("Delete failed");
-    }
+  const handleDelete = (id: string) => {
+    Modal.confirm({
+      title: "Are you sure?",
+      content: "This action cannot be undone.",
+      okText: "Yes, Delete",
+      okType: "danger",
+      onOk: async () => {
+        try {
+          await deleteCodeService(id);
+          message.success("Paste deleted");
+          resetToCreateMode();
+          fetchData();
+        } catch (err) {
+          message.error("Delete failed");
+        }
+      },
+    });
   };
 
   const handleLike = async (id: string) => {
-    if (!currentUser) {
-      alert("กรุณาเข้าสู่ระบบเพื่อกด Like");
-      return;
-    }
+    if (!currentUser) return message.warning("Please login to like pastes");
     await likeCodeService(id);
-    fetchData(); 
-
-    // อัปเดต selectedCode ทันทีเพื่อให้เลข Like เปลี่ยน
-    const updatedList = await getCodes();
-    const updatedItem = updatedList.find((c) => c.id === id);
-    if (updatedItem && selectedCode?.id === id) {
-      setSelectedCode(updatedItem);
+    const updatedCodes = await getCodes();
+    setCodes(updatedCodes);
+    if (selectedCode?.id === id) {
+      const updatedItem = updatedCodes.find(c => c.id === id);
+      if (updatedItem) setSelectedCode(updatedItem);
     }
   };
 
-  return (
-    <div style={styles.pageContainer}>
-      {/* 1. NAVBAR */}
-      <nav style={styles.navbar}>
-        <div style={styles.navContent}>
-          <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
-            <h1 style={styles.logo} onClick={resetToCreateMode}>
-              PASTEBIN
-              <span style={{ fontSize: "12px", color: "#ccc" }}> clone</span>
-            </h1>
-            <button style={styles.navBtn} onClick={resetToCreateMode}>
-              + New Paste
-            </button>
-          </div>
+  // --- Render Helpers ---
 
-          <div style={styles.searchBarContainer}>
-            <input placeholder="Search..." style={styles.searchInput} />
-            <button style={styles.searchBtn}>🔍</button>
-          </div>
-
-          <div style={{ display: "flex", alignItems: "center", gap: "15px" }}>
-            {currentUser ? (
-              <>
-                <span style={{ color: "#ccc", fontSize: "14px" }}>
-                  Welcome, <b>{currentUser.username}</b>
-                </span>
-                <button onClick={handleLogout} style={styles.logoutBtn}>
-                  Sign out
-                </button>
-              </>
-            ) : (
-              <>
-                <button
-                  onClick={() => navigate("/login")}
-                  style={styles.loginBtn}
-                >
-                  Login
-                </button>
-                <button
-                  onClick={() => navigate("/register")}
-                  style={styles.registerBtn}
-                >
-                  Register
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-      </nav>
-
-      {/* 2. MAIN LAYOUT */}
-      <div style={styles.mainLayout}>
-        {/* --- LEFT COLUMN: Editor --- */}
-        <div style={styles.leftColumn}>
-          {/* WARNING BANNER (เฉพาะ Guest) */}
-          {!currentUser && !selectedCode && (
-            <div style={styles.warningBanner}>
-              <span style={{ marginRight: "10px", fontSize: "18px" }}>ⓘ</span>
-              <span>
-                You are currently not logged in...{" "}
-                <span onClick={() => navigate("/register")} style={styles.link}>
-                  Sign Up
-                </span>
-                {" or "}
-                <span onClick={() => navigate("/login")} style={styles.link}>
-                  Login
-                </span>
-              </span>
-            </div>
-          )}
-
-          <div style={styles.editorHeader}>
-            {selectedCode ? (
-              <h3>
-                {isEditing ? "Editing Paste" : selectedCode.title}
-                {!isEditing && (
-                  <span style={styles.badge}>{selectedCode.language}</span>
-                )}
-              </h3>
-            ) : (
-              <h3>New Paste</h3>
-            )}
-          </div>
-
-          <div style={styles.editorContainer}>
-            {selectedCode && !isEditing ? (
-              // VIEW MODE
-              <pre style={styles.codeView}>
-                <code>{selectedCode.content}</code>
-              </pre>
-            ) : (
-              // CREATE / EDIT MODE
-              <textarea
-                style={styles.textarea}
-                placeholder="Paste your code here..."
-                // ✅ ใช้ตัวแปร State กลาง (contentInput)
-                value={contentInput}
-                onChange={(e) => setContentInput(e.target.value)}
-              />
-            )}
-          </div>
-
-          {/* SETTINGS AREA (แสดงเมื่อ Login และ (กำลังสร้าง หรือ กำลังแก้ไข)) */}
-          {currentUser && (!selectedCode || isEditing) && (
-            <div style={styles.settingsPanel}>
-              <h4
-                style={{
-                  color: "#fff",
-                  borderBottom: "1px solid #444",
-                  paddingBottom: "5px",
-                }}
+  const renderEditorOrView = () => {
+    // Determine if we are in Dark Mode based on Ant Design's token
+    // (If the background is dark, we use the Dark code theme)
+    const isDarkMode = token.colorBgContainer === '#141414' || token.colorBgLayout === '#000000';
+    
+    if (selectedCode && !isEditing) {
+      return (
+        <Card
+          style={{ height: '100%' }}
+          title={
+            <Space>
+              <Title level={4} style={{ margin: 0 }}>{selectedCode.title}</Title>
+              <Tag color="blue">{selectedCode.language}</Tag>
+              {selectedCode.visibility === 'PRIVATE' && <Tag color="gold">Private</Tag>}
+            </Space>
+          }
+          extra={
+            <Space>
+              <Button
+                type="text"
+                icon={
+                  currentUser && selectedCode.likes.some(u => u.id === currentUser.id)
+                    ? <HeartFilled style={{ color: 'red' }} />
+                    : <HeartOutlined />
+                }
+                onClick={() => handleLike(selectedCode.id)}
               >
-                {isEditing ? "Edit Settings" : "Optional Paste Settings"}
-              </h4>
+                {selectedCode.likes.length}
+              </Button>
+              <Text type="secondary" style={{ fontSize: '12px' }}>
+                By {selectedCode.author.username} • {new Date(selectedCode.createdAt).toLocaleDateString()}
+              </Text>
+            </Space>
+          }
+        >
+          {/* REPLACED <pre> WITH SyntaxHighlighter */}
+          <SyntaxHighlighter
+            language={selectedCode.language === 'text' ? 'text' : selectedCode.language}
+            style={isDarkMode ? vscDarkPlus : vs} // Auto-switch theme
+            showLineNumbers={true}                // <--- Adds Line Numbers
+            wrapLines={true}                      // <--- Wraps long lines
+            customStyle={{
+              margin: 0,
+              borderRadius: token.borderRadius,
+              border: `1px solid ${token.colorBorder}`,
+              fontSize: '14px',
+              backgroundColor: isDarkMode ? '#1e1e1e' : '#f5f5f5', // Match AntD card bg
+            }}
+            lineNumberStyle={{
+              minWidth: '2.5em',
+              paddingRight: '1em',
+              color: isDarkMode ? '#6e7681' : '#bfbfbf', // Subtle line numbers
+              textAlign: 'right'
+            }}
+          >
+            {selectedCode.content}
+          </SyntaxHighlighter>
 
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Paste Title:</label>
-                <input
-                  style={styles.input}
-                  // ✅ ใช้ตัวแปร State กลาง
-                  value={titleInput}
-                  onChange={(e) => setTitleInput(e.target.value)}
-                />
-              </div>
-
-              <div style={styles.row}>
-                <div style={{ ...styles.formGroup, flex: 1 }}>
-                  <label style={styles.label}>Syntax Highlight:</label>
-                  {/* ✅ ลบ disabled ออก เพื่อให้แก้ไขได้ */}
-                  <select
-                    style={styles.select}
-                    value={langInput}
-                    onChange={(e) => setLangInput(e.target.value)}
-                  >
-                    <option value="javascript">JavaScript</option>
-                    <option value="typescript">TypeScript</option>
-                    <option value="python">Python</option>
-                    <option value="html">HTML</option>
-                    <option value="css">CSS</option>
-                    <option value="text">None (Text)</option>
-                  </select>
-                </div>
-                <div style={{ ...styles.formGroup, flex: 1 }}>
-                  <label style={styles.label}>Paste Exposure:</label>
-                  <select
-                    style={styles.select}
-                    value={visibilityInput}
-                    onChange={(e) => setVisibilityInput(e.target.value as any)}
-                  >
-                    <option value="PUBLIC">Public</option>
-                    <option value="PRIVATE">Private</option>
-                  </select>
-                </div>
-              </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Tags:</label>
-                <input
-                  style={styles.input}
-                  placeholder="react, api, tutorial"
-                  value={tagsInput}
-                  onChange={(e) => setTagsInput(e.target.value)}
-                />
-              </div>
-
-              <div style={{ marginTop: "20px" }}>
-                {isEditing ? (
-                  <>
-                    <button style={styles.primaryBtn} onClick={handleUpdate}>
-                      Save Changes
-                    </button>
-                    <button
-                      style={styles.secondaryBtn}
-                      onClick={() => {
-                        setIsEditing(false);
-                        // ถ้ากดยกเลิก ให้คืนค่า Content เดิมกลับมา (ถ้าต้องการ)
-                        if (selectedCode) setContentInput(selectedCode.content);
-                      }}
-                    >
-                      Cancel
-                    </button>
-                  </>
-                ) : (
-                  <button style={styles.primaryBtn} onClick={handleCreate}>
-                    Create New Paste
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* ACTIONS BAR - View Mode */}
-          {selectedCode && !isEditing && (
-            <div style={styles.actionBar}>
-              <div style={{ display: "flex", gap: "10px" }}>
-                <button
-                  style={styles.actionBtn}
-                  onClick={() => handleLike(selectedCode.id)}
-                >
-                  {currentUser &&
-                  selectedCode.likes.some((u) => u.id === currentUser.id)
-                    ? "❤️"
-                    : "🤍"}{" "}
-                  Like ({selectedCode.likes.length})
-                </button>
-                <span
-                  style={{
-                    color: "#888",
-                    fontSize: "12px",
-                    alignSelf: "center",
-                  }}
-                >
-                  By {selectedCode.author.username} •{" "}
-                  {new Date(selectedCode.createdAt).toLocaleDateString()}
-                </span>
-              </div>
-
-              {(currentUser?.id === selectedCode.author.id ||
-                currentUser?.role === "ADMIN") && (
-                <div>
-                  {/* ✅ เรียก startEditMode แทนการ set state เอง */}
-                  <button
-                    style={{ ...styles.actionBtn, color: "#fb8c00" }}
-                    onClick={startEditMode}
-                  >
-                    Edit
-                  </button>
-                  <button
-                    style={{ ...styles.actionBtn, color: "#ff5252" }}
-                    onClick={() => handleDelete(selectedCode.id)}
-                  >
-                    Delete
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* --- RIGHT COLUMN: Sidebar --- */}
-        <div style={styles.rightColumn}>
-          <div style={styles.sidebarHeader}>Public Pastes</div>
-          <div style={styles.sidebarList}>
-            {codes.map((code) => (
-              <div
-                key={code.id}
-                style={{
-                  ...styles.sidebarItem,
-                  backgroundColor:
-                    selectedCode?.id === code.id ? "#333" : "transparent",
-                }}
-                onClick={() => {
-                  handleSelectCode(code);
-                  navigate(`/snippet/${code.id}`);
-                }}
-              >
-                <div style={styles.sidebarIcon}>
-                  {code.visibility === "PRIVATE" ? "🔒" : "🌍"}
-                </div>
-                <div style={styles.sidebarInfo}>
-                  <div style={styles.sidebarTitle}>
-                    {code.title || "Untitled"}
-                  </div>
-                  <div style={styles.sidebarMeta}>
-                    {code.language} |{" "}
-                    {new Date(code.createdAt).toLocaleTimeString()}
-                  </div>
-                </div>
-              </div>
+          <div style={{ marginTop: 16 }}>
+            {selectedCode.tags.map(tag => (
+              <Tag key={tag.id} color="geekblue">#{tag.name}</Tag>
             ))}
           </div>
-        </div>
-      </div>
-    </div>
-  );
-};
 
-const styles: { [key: string]: React.CSSProperties } = {
-  pageContainer: {
-    backgroundColor: "#181818",
-    minHeight: "100vh",
-    color: "#e0e0e0",
-    fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
-  },
-  navbar: {
-    backgroundColor: "#222",
-    borderBottom: "1px solid #333",
-    padding: "10px 0",
-    position: "sticky",
-    top: 0,
-    zIndex: 100,
-  },
-  navContent: {
-    maxWidth: "1200px",
-    margin: "0 auto",
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: "0 20px",
-  },
-  logo: {
-    margin: 0,
-    fontSize: "24px",
-    fontWeight: "bold",
-    color: "#fff",
-    letterSpacing: "1px",
-    cursor: "pointer",
-  },
-  navBtn: {
-    backgroundColor: "#4caf50",
-    color: "#fff",
-    border: "none",
-    padding: "6px 12px",
-    borderRadius: "3px",
-    cursor: "pointer",
-    fontWeight: "bold",
-    fontSize: "12px",
-    textTransform: "uppercase",
-  },
-  searchBarContainer: {
-    display: "flex",
-    alignItems: "center",
-    backgroundColor: "#333",
-    borderRadius: "3px",
-    overflow: "hidden",
-  },
-  searchInput: {
-    backgroundColor: "transparent",
-    border: "none",
-    color: "#fff",
-    padding: "8px",
-    outline: "none",
-    minWidth: "300px",
-  },
-  searchBtn: {
-    backgroundColor: "#444",
-    border: "none",
-    color: "#ccc",
-    padding: "8px 12px",
-    cursor: "pointer",
-  },
-  logoutBtn: {
-    backgroundColor: "#333",
-    color: "#ccc",
-    border: "1px solid #555",
-    padding: "5px 10px",
-    borderRadius: "3px",
-    cursor: "pointer",
-  },
-  loginBtn: {
-    backgroundColor: "transparent",
-    color: "#fff",
-    border: "1px solid #fff",
-    padding: "6px 15px",
-    borderRadius: "3px",
-    cursor: "pointer",
-    marginRight: "10px",
-    fontSize: "12px",
-    fontWeight: "bold",
-  },
-  registerBtn: {
-    backgroundColor: "#fff",
-    color: "#000",
-    border: "none",
-    padding: "7px 15px",
-    borderRadius: "3px",
-    cursor: "pointer",
-    fontSize: "12px",
-    fontWeight: "bold",
-  },
-  mainLayout: {
-    maxWidth: "1200px",
-    margin: "20px auto",
-    display: "flex",
-    gap: "20px",
-    padding: "0 20px",
-  },
-  leftColumn: { flex: 3 },
-  rightColumn: { flex: 1 },
-  editorHeader: {
-    borderBottom: "1px solid #333",
-    paddingBottom: "10px",
-    marginBottom: "10px",
-    display: "flex",
-    alignItems: "center",
-    gap: "10px",
-  },
-  editorContainer: { marginBottom: "20px" },
-  textarea: {
-    width: "100%",
-    minHeight: "400px",
-    backgroundColor: "#222",
-    color: "#d4d4d4",
-    border: "1px solid #333",
-    padding: "15px",
-    fontFamily: "'Consolas', 'Monaco', monospace",
-    fontSize: "14px",
-    resize: "vertical",
-    outline: "none",
-    boxSizing: "border-box",
-  },
-  codeView: {
-    minHeight: "400px",
-    backgroundColor: "#1e1e1e",
-    color: "#d4d4d4",
-    border: "1px solid #333",
-    padding: "15px",
-    fontFamily: "'Consolas', 'Monaco', monospace",
-    fontSize: "14px",
-    margin: 0,
-    whiteSpace: "pre-wrap",
-    overflowWrap: "break-word",
-  },
-  settingsPanel: {
-    backgroundColor: "#222",
-    padding: "20px",
-    border: "1px solid #333",
-    borderRadius: "4px",
-  },
-  row: { display: "flex", gap: "20px" },
-  formGroup: { marginBottom: "15px" },
-  label: {
-    display: "block",
-    color: "#888",
-    marginBottom: "5px",
-    fontSize: "13px",
-    fontWeight: "bold",
-  },
-  input: {
-    width: "100%",
-    padding: "8px",
-    backgroundColor: "#333",
-    border: "1px solid #444",
-    color: "#fff",
-    borderRadius: "3px",
-    boxSizing: "border-box",
-  },
-  select: {
-    width: "100%",
-    padding: "8px",
-    backgroundColor: "#333",
-    border: "1px solid #444",
-    color: "#fff",
-    borderRadius: "3px",
-  },
-  primaryBtn: {
-    backgroundColor: "#f1c40f",
-    color: "#000",
-    fontWeight: "bold",
-    padding: "10px 20px",
-    border: "none",
-    borderRadius: "3px",
-    cursor: "pointer",
-    fontSize: "14px",
-  },
-  secondaryBtn: {
-    backgroundColor: "transparent",
-    color: "#ccc",
-    padding: "10px 20px",
-    border: "none",
-    cursor: "pointer",
-    marginLeft: "10px",
-  },
-  actionBar: {
-    marginTop: "10px",
-    padding: "15px",
-    backgroundColor: "#222",
-    border: "1px solid #333",
-    display: "flex",
-    justifyContent: "space-between",
-  },
-  actionBtn: {
-    background: "none",
-    border: "none",
-    color: "#ccc",
-    cursor: "pointer",
-    fontWeight: "bold",
-    fontSize: "13px",
-  },
-  sidebarHeader: {
-    fontSize: "14px",
-    fontWeight: "bold",
-    color: "#888",
-    textTransform: "uppercase",
-    borderBottom: "2px solid #4caf50",
-    paddingBottom: "5px",
-    marginBottom: "10px",
-  },
-  sidebarList: { display: "flex", flexDirection: "column", gap: "5px" },
-  sidebarItem: {
-    display: "flex",
-    gap: "10px",
-    padding: "8px",
-    borderBottom: "1px solid #222",
-    cursor: "pointer",
-    borderRadius: "3px",
-    transition: "background 0.2s",
-  },
-  sidebarIcon: { fontSize: "18px" },
-  sidebarInfo: { overflow: "hidden" },
-  sidebarTitle: {
-    color: "#4caf50",
-    fontWeight: "bold",
-    fontSize: "13px",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-  },
-  sidebarMeta: { color: "#666", fontSize: "11px", marginTop: "2px" },
-  badge: {
-    backgroundColor: "#444",
-    color: "#fff",
-    padding: "2px 6px",
-    borderRadius: "3px",
-    fontSize: "11px",
-    marginLeft: "10px",
-  },
-  warningBanner: {
-    backgroundColor: "#2c2c2c",
-    border: "1px solid #444",
-    color: "#ccc",
-    padding: "10px 15px",
-    borderRadius: "4px",
-    marginBottom: "20px",
-    fontSize: "13px",
-    display: "flex",
-    alignItems: "center",
-  },
-  link: {
-    color: "#64b5f6",
-    cursor: "pointer",
-    textDecoration: "underline",
-  },
+          {(currentUser?.id === selectedCode.author.id || currentUser?.role === "ADMIN") && (
+            <>
+              <Divider />
+              <Space>
+                <Button icon={<EditOutlined />} onClick={startEditMode}>Edit</Button>
+                <Button danger icon={<DeleteOutlined />} onClick={() => handleDelete(selectedCode.id)}>Delete</Button>
+              </Space>
+            </>
+          )}
+        </Card>
+      );
+    }
+
+    // Create or Edit Mode
+    return (
+      <Card title={isEditing ? "Edit Paste" : "New Paste"} bordered={false} style={{ height: '100%' }}>
+        <TextArea
+          rows={20}
+          placeholder="Paste your code here..."
+          value={contentInput}
+          onChange={(e) => setContentInput(e.target.value)}
+          style={{ 
+            fontFamily: "'Consolas', 'Monaco', monospace", 
+            fontSize: '14px', 
+            resize: 'none',
+            // Optional: Force the editor to use the same background color as the view mode for perfect matching
+            backgroundColor: token.colorFillQuaternary 
+          }}
+        />
+
+        {currentUser ? (
+          <div style={{ marginTop: 24 }}>
+            <Row gutter={[16, 16]}>
+              <Col span={24}>
+                <Input
+                  placeholder="Paste Title"
+                  value={titleInput}
+                  onChange={e => setTitleInput(e.target.value)}
+                  prefix={<CodeOutlined />}
+                />
+              </Col>
+              <Col span={12}>
+                <Select
+                  style={{ width: '100%' }}
+                  value={langInput}
+                  onChange={setLangInput}
+                  options={[
+                    { value: 'javascript', label: 'JavaScript' },
+                    { value: 'typescript', label: 'TypeScript' },
+                    { value: 'python', label: 'Python' },
+                    { value: 'html', label: 'HTML' },
+                    { value: 'css', label: 'CSS' },
+                    { value: 'text', label: 'Plain Text' },
+                  ]}
+                />
+              </Col>
+              <Col span={12}>
+                <Select
+                  style={{ width: '100%' }}
+                  value={visibilityInput}
+                  onChange={setVisibilityInput}
+                  options={[
+                    { value: 'PUBLIC', label: <span><GlobalOutlined /> Public</span> },
+                    { value: 'PRIVATE', label: <span><LockOutlined /> Private</span> },
+                  ]}
+                />
+              </Col>
+              <Col span={24}>
+                <Input
+                  placeholder="Tags (comma separated, e.g. react, api)"
+                  value={tagsInput}
+                  onChange={e => setTagsInput(e.target.value)}
+                />
+              </Col>
+            </Row>
+
+            <Divider />
+
+            <Space>
+              <Button
+                type="primary"
+                icon={isEditing ? <EditOutlined /> : <PlusOutlined />}
+                onClick={isEditing ? handleUpdate : handleCreate}
+                size="large"
+              >
+                {isEditing ? "Save Changes" : "Create New Paste"}
+              </Button>
+
+              {isEditing && (
+                <Button size="large" onClick={() => setIsEditing(false)}>Cancel</Button>
+              )}
+            </Space>
+          </div>
+        ) : (
+          <div style={{ marginTop: 16 }}>
+            <Button type="primary" onClick={handleCreate} size="large">Create as Guest</Button>
+          </div>
+        )}
+      </Card>
+    );
+  };
+
+  return (
+    <Layout style={{ minHeight: '100vh', background: token.colorBgLayout }}>
+      {/* 1. Navbar: Switched from hardcoded #001529 to token.colorBgContainer so it respects theme */}
+      <Header style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding: '0 24px',
+        background: token.colorBgContainer, // Dynamic background
+        borderBottom: `1px solid ${token.colorBorder}`
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }} onClick={resetToCreateMode}>
+          <Title level={3} style={{ margin: 0 }}>NESTBIN</Title>
+        </div>
+
+        {/* SEARCH BAR & DROPDOWN */}
+        <div style={{ position: 'relative', flex: 1, margin: '0 40px', maxWidth: '800px' }}>
+          <Input
+            prefix={<SearchOutlined style={{ color: token.colorTextPlaceholder }} />}
+            placeholder="Search by Title, Language, or Tag..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            allowClear
+            style={{ width: '100%' }}
+          />
+          {/* SEARCH RESULTS OVERLAY */}
+          {searchQuery && (
+            <Card
+              style={{
+                position: 'absolute',
+                top: '100%',
+                width: '100%',
+                zIndex: 1000,
+                boxShadow: token.boxShadowSecondary,
+                maxHeight: '400px',
+                overflowY: 'auto',
+                borderRadius: '8px',
+                background: token.colorBgElevated // Dynamic Dropdown Background
+              }}
+              bodyStyle={{ padding: 0 }} // Reset padding so header sits flush
+            >
+              <div style={{
+                padding: '8px 16px',
+                background: token.colorFillAlter, // Subtle offset color
+                borderBottom: `1px solid ${token.colorBorder}`,
+                display: 'flex',
+                justifyContent: 'space-between'
+              }}>
+                <Text type="secondary" style={{ fontSize: 12 }}>Found {searchResults.length} results</Text>
+                <CloseCircleFilled onClick={() => setSearchQuery("")} style={{ cursor: 'pointer', color: token.colorTextDescription }} />
+              </div>
+              {searchResults.length === 0 ? (
+                <Empty description="No matching pastes found" image={Empty.PRESENTED_IMAGE_SIMPLE} style={{ padding: 20 }} />
+              ) : (
+                <List
+                  dataSource={searchResults}
+                  renderItem={item => (
+                    <List.Item
+                      style={{
+                        padding: '10px 16px',
+                        cursor: 'pointer',
+                        transition: 'background 0.2s',
+                      }}
+                      className="search-result-item"
+                      // Add hover effect via CSS or simple style prop logic (CSS class recommended for hover in React)
+                      onMouseEnter={(e) => e.currentTarget.style.background = token.colorFillTertiary}
+                      onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                      onClick={() => {
+                        handleSelectCode(item);
+                        navigate(`/snippet/${item.id}`);
+                      }}
+                    >
+                      <List.Item.Meta
+                        avatar={<Avatar size="small" style={{ backgroundColor: token.colorPrimary }} icon={<CodeOutlined />} />}
+                        title={<Text strong>{item.title || "Untitled"}</Text>}
+                        description={`${item.language} • ${new Date(item.createdAt).toLocaleDateString()}`}
+                      />
+                      {item.visibility === 'PRIVATE' && <Tag color="gold">Private</Tag>}
+                    </List.Item>
+                  )}
+                />
+              )}
+            </Card>
+          )}
+        </div>
+
+        <Space>
+          <Button type="primary" icon={<PlusOutlined />} onClick={resetToCreateMode}>New Paste</Button>
+          
+          {currentUser ? (
+            <>
+              {currentUser.role === 'ADMIN' && (
+                <Button 
+                  type="primary" 
+                  danger // Makes the button red to stand out
+                  icon={<SafetyCertificateOutlined />} 
+                  onClick={() => navigate('/admin')}
+                >
+                  Admin Panel
+                </Button>
+              )}
+
+              <Text><UserOutlined /> {currentUser.username}</Text>
+              <Button type="text" icon={<LogoutOutlined />} onClick={handleLogout}>Logout</Button>
+            </>
+          ) : (
+            <>
+              <Button type="default" icon={<LoginOutlined />} onClick={() => navigate("/login")}>Login</Button>
+              <Button type="primary" onClick={() => navigate("/register")}>Register</Button>
+            </>
+          )}
+        </Space>
+      </Header>
+
+      {/* 2. Main Content */}
+      <Content style={{ padding: "24px", width: "100%" }}>
+        <Row gutter={24}>
+
+          {/* LEFT COLUMN: Editor / View */}
+          <Col xs={24} md={18} lg={19}>
+            {!currentUser && !selectedCode && (
+              <Alert
+                message="You are currently not logged in"
+                description="Sign up or Login to save your pastes privately and edit them later."
+                type="info"
+                showIcon
+                closable
+                style={{ marginBottom: 24 }}
+                action={
+                  <Space>
+                    <Button size="small" type="primary" onClick={() => navigate('/register')}>Sign Up</Button>
+                    <Button size="small" onClick={() => navigate('/login')}>Login</Button>
+                  </Space>
+                }
+              />
+            )}
+
+            {renderEditorOrView()}
+          </Col>
+
+          {/* RIGHT COLUMN: Sidebar (Always Latest 5) */}
+          <Col xs={24} md={6} lg={5}>
+            <Card
+              title={<span><FireOutlined style={{ color: 'orange' }} /> Trending (Week)</span>} // Updated Title
+              bodyStyle={{ padding: 0 }}
+            >
+              <List
+                loading={loading}
+                itemLayout="horizontal"
+                dataSource={trendingCodes} // <--- Use the new sorted list
+                style={{ maxHeight: '80vh', overflowY: 'auto' }}
+                renderItem={item => (
+                  <List.Item
+                    style={{
+                      padding: '12px 16px',
+                      cursor: 'pointer',
+                      background: selectedCode?.id === item.id ? token.colorPrimaryBg : 'transparent',
+                      transition: 'background 0.3s'
+                    }}
+                    onClick={() => {
+                      handleSelectCode(item);
+                      navigate(`/snippet/${item.id}`);
+                    }}
+                  >
+                    <List.Item.Meta
+                      avatar={
+                        // Show Rank Number (1, 2, 3...)
+                        <Avatar
+                          size="small"
+                          style={{ 
+                             backgroundColor: trendingCodes.indexOf(item) === 0 ? '#ffbf00' : token.colorFillContent, 
+                             color: trendingCodes.indexOf(item) === 0 ? 'white' : token.colorText 
+                          }}
+                        >
+                          {trendingCodes.indexOf(item) + 1}
+                        </Avatar>
+                      }
+                      title={
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <Text strong style={{ fontSize: 13, maxWidth: '100px' }} ellipsis>{item.title || "Untitled"}</Text>
+                          {/* 2. ADD LIKE COUNT HERE */}
+                          <Space size={4} style={{ fontSize: 12, color: token.colorTextSecondary }}>
+                            <HeartFilled style={{ color: 'red', fontSize: 10 }} />
+                            {item.likes.length}
+                          </Space>
+                        </div>
+                      }
+                      description={
+                        <Space direction="vertical" size={0}>
+                          <Tag style={{ margin: 0, fontSize: 10 }}>{item.language}</Tag>
+                        </Space>
+                      }
+                    />
+                  </List.Item>
+                )}
+              />
+              
+              {/* Fallback if no trending posts */}
+              {trendingCodes.length === 0 && (
+                <div style={{ padding: 20, textAlign: 'center', color: token.colorTextDescription }}>
+                  No trending posts this week
+                </div>
+              )}
+            </Card>
+          </Col>
+        </Row>
+      </Content>
+    </Layout>
+  );
 };
 
 export default Dashboard;

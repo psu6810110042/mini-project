@@ -89,18 +89,40 @@ export class SnippetsService {
     });
   }
 
-  async update(id: string, updateDto: any, user: User) {
-    const snippet = await this.findOne(id, user); // Re-use findOne to handle 404/403 checks automatically
+async update(id: string, updateDto: any, user: User) {
+    const snippet = await this.findOne(id, user);
 
-    // OWNERSHIP CHECK: Only Author or Admin can edit
     if (user.role !== 'ADMIN' && snippet.author.id !== user.id) {
       throw new ForbiddenException('You can only edit your own snippets');
     }
 
-    // Update content/language/visibility
-    // Note: We are skipping tag updates for simplicity, but you can add it if needed
-    Object.assign(snippet, updateDto); 
-    
+    if (updateDto.tags) {
+      const tagEntities: Tag[] = [];
+      
+      // Loop through the strings sent from frontend
+      for (const rawTagName of updateDto.tags) {
+        const tagName = rawTagName.toLowerCase();
+        
+        // Check if tag exists
+        let tag = await this.tagRepo.findOneBy({ name: tagName });
+        
+        // If not, create it
+        if (!tag) {
+          tag = this.tagRepo.create({ name: tagName });
+          await this.tagRepo.save(tag);
+        }
+        
+        tagEntities.push(tag);
+      }
+      
+      snippet.tags = tagEntities;
+    }
+
+    if (updateDto.title) snippet.title = updateDto.title;
+    if (updateDto.content) snippet.content = updateDto.content;
+    if (updateDto.language) snippet.language = updateDto.language;
+    if (updateDto.visibility) snippet.visibility = updateDto.visibility;
+
     return this.snippetRepo.save(snippet);
   }
 
