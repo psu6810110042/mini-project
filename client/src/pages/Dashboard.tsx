@@ -20,18 +20,10 @@ const Dashboard = () => {
   const [isEditing, setIsEditing] = useState(false);
 
   useEffect(() => {
-    // 1. ลองดึง User จาก LocalStorage (ถ้ามี)
     const storedUserStr = localStorage.getItem('user');
     if (storedUserStr) { 
-        try { 
-            setCurrentUser(JSON.parse(storedUserStr)); 
-        } catch (e) { 
-            console.error(e); 
-        } 
+        try { setCurrentUser(JSON.parse(storedUserStr)); } catch (e) { console.error(e); } 
     }
-    // ❌ ลบโค้ดที่ดีดไปหน้า Login ทิ้งไปแล้ว (เพื่อให้ Guest เข้าได้)
-
-    // 2. โหลดข้อมูล Code
     fetchData();
   }, []);
 
@@ -44,27 +36,23 @@ const Dashboard = () => {
 
   // --- Actions ---
   const handleCreate = async () => {
-    // ✅ เช็คก่อนสร้าง: ถ้ายังไม่ล็อกอิน ให้ไปหน้า Login
-    if (!currentUser) {
-        if(confirm("ต้องเข้าสู่ระบบก่อนสร้าง Code ครับ\nไปหน้า Login เลยไหม?")) {
-            navigate('/login');
-        }
-        return;
-    }
-
     if (!newContent) return alert("กรุณาใส่เนื้อหา Code");
+    
+    const titleToSend = currentUser ? (newTitle || "Untitled") : "Untitled";
+    const langToSend = currentUser ? newLang : "text"; 
+    
     try {
         const tagsArray = newTags.split(',').map(t => t.trim()).filter(t => t !== "");
         await createCodeService({
-            title: newTitle || "Untitled",
+            title: titleToSend,
             content: newContent,
-            language: newLang,
+            language: langToSend,
             visibility: newVisibility,
             tags: tagsArray
         });
         setNewTitle(""); setNewContent(""); setNewTags(""); 
         fetchData();
-        alert("Paste created!");
+        alert("Paste created successfully!");
     } catch (err: any) { alert("Error: " + err.message); }
   };
 
@@ -91,7 +79,6 @@ const Dashboard = () => {
   };
 
   const handleLike = async (id: string) => {
-      // ✅ เช็คก่อน Like
       if (!currentUser) {
           alert("กรุณาเข้าสู่ระบบเพื่อกด Like");
           return;
@@ -117,8 +104,7 @@ const Dashboard = () => {
       <nav style={styles.navbar}>
         <div style={styles.navContent}>
             <div style={{display: 'flex', alignItems: 'center', gap: '20px'}}>
-                <h1 style={styles.logo} onClick={resetToCreateMode}>NESTBIN<span style={{fontSize:'12px', color:'#ccc'}}> clone</span></h1>
-                {/* ปุ่ม New Paste จะกดได้ไหม? ถ้าเป็น Guest กดแล้วจะไปฟังก์ชัน handleCreate ซึ่งเราดัก Login ไว้แล้ว */}
+                <h1 style={styles.logo} onClick={resetToCreateMode}>PASTEBIN<span style={{fontSize:'12px', color:'#ccc'}}> clone</span></h1>
                 <button style={styles.navBtn} onClick={resetToCreateMode}>+ New Paste</button>
             </div>
             
@@ -127,16 +113,13 @@ const Dashboard = () => {
                 <button style={styles.searchBtn}>🔍</button>
             </div>
 
-            {/* ✅ ส่วนขวาบน: เช็คว่ามี User ไหม? */}
             <div style={{display: 'flex', alignItems: 'center', gap: '15px'}}>
                 {currentUser ? (
-                    // กรณี Login แล้ว
                     <>
                         <span style={{color: '#ccc', fontSize: '14px'}}>Welcome, <b>{currentUser.username}</b></span>
                         <button onClick={handleLogout} style={styles.logoutBtn}>Sign out</button>
                     </>
                 ) : (
-                    // กรณี Guest (ยังไม่ Login)
                     <>
                         <button onClick={() => navigate('/login')} style={styles.loginBtn}>Login</button>
                         <button onClick={() => navigate('/register')} style={styles.registerBtn}>Register</button>
@@ -152,6 +135,20 @@ const Dashboard = () => {
         {/* --- LEFT COLUMN: Editor --- */}
         <div style={styles.leftColumn}>
             
+            {/* ✅ WARNING BANNER (เฉพาะ Guest) */}
+            {!currentUser && !selectedCode && (
+                <div style={styles.warningBanner}>
+                    <span style={{marginRight: '10px', fontSize: '18px'}}>ⓘ</span>
+                    <span>
+                        You are currently not logged in, this means you can not edit or delete anything you paste. 
+                        {' '}
+                        <span onClick={() => navigate('/register')} style={styles.link}>Sign Up</span>
+                        {' or '}
+                        <span onClick={() => navigate('/login')} style={styles.link}>Login</span>
+                    </span>
+                </div>
+            )}
+
             <div style={styles.editorHeader}>
                 {selectedCode ? (
                     <h3>
@@ -173,23 +170,21 @@ const Dashboard = () => {
                     // CREATE / EDIT MODE
                     <textarea 
                         style={styles.textarea}
-                        placeholder={currentUser ? "Paste your code here..." : "กรุณาเข้าสู่ระบบเพื่อเขียน Code..."}
+                        placeholder="Paste your code here..."
                         value={selectedCode && isEditing ? selectedCode.content : newContent}
                         onChange={e => {
                             if (isEditing && selectedCode) setSelectedCode({...selectedCode, content: e.target.value});
                             else setNewContent(e.target.value);
                         }}
-                        // อาจจะ disable ถ้าเป็น Guest ก็ได้ แต่ปล่อยไว้ให้พิมพ์เล่นแต่กด Create ไม่ได้ก็น่าจะดีกว่า
                     />
                 )}
             </div>
 
-            {/* Settings Area */}
-            {(!selectedCode || isEditing) && (
+            {/* ✅ Settings Area & Create Button (เฉพาะ User ที่ Login แล้วเท่านั้น) */}
+            {currentUser && (!selectedCode || isEditing) && (
                 <div style={styles.settingsPanel}>
                     <h4 style={{color: '#fff', borderBottom:'1px solid #444', paddingBottom:'5px'}}>Optional Paste Settings</h4>
                     
-                    {/* ... (Inputs เหมือนเดิม) ... */}
                     <div style={styles.formGroup}>
                         <label style={styles.label}>Paste Title:</label>
                         <input 
@@ -253,13 +248,14 @@ const Dashboard = () => {
                     </div>
                 </div>
             )}
+            
+            {/* ❌ เอาปุ่ม Create สำหรับ Guest ออกไปแล้ว ตามคำขอ */}
 
-            {/* Actions Bar (Like/Edit/Delete) */}
+            {/* Actions Bar (Like/Edit/Delete) - View Mode */}
             {selectedCode && !isEditing && (
                 <div style={styles.actionBar}>
                     <div style={{display:'flex', gap:'10px'}}>
                         <button style={styles.actionBtn} onClick={() => handleLike(selectedCode.id)}>
-                            {/* เช็ค currentUser ก่อน render ปุ่มไลก์ หรือกดแล้วค่อยเช็คก็ได้ */}
                             {currentUser && selectedCode.likes.some(u => u.id === currentUser.id) ? '❤️' : '🤍'} Like ({selectedCode.likes.length})
                         </button>
                         <span style={{color:'#888', fontSize:'12px', alignSelf:'center'}}>
@@ -314,9 +310,8 @@ const Dashboard = () => {
   );
 };
 
-// --- CSS Styles (เพิ่มปุ่ม Login/Register) ---
 const styles: {[key: string]: React.CSSProperties} = {
-    // ... (Styles เดิมทั้งหมด ให้คงไว้เหมือนเดิม) ...
+    // ... (คงเดิม) ...
     pageContainer: { backgroundColor: '#181818', minHeight: '100vh', color: '#e0e0e0', fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif" },
     navbar: { backgroundColor: '#222', borderBottom: '1px solid #333', padding: '10px 0', position: 'sticky', top: 0, zIndex: 100 },
     navContent: { maxWidth: '1200px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 20px' },
@@ -326,12 +321,8 @@ const styles: {[key: string]: React.CSSProperties} = {
     searchInput: { backgroundColor: 'transparent', border: 'none', color: '#fff', padding: '8px', outline: 'none', minWidth: '300px' },
     searchBtn: { backgroundColor: '#444', border: 'none', color: '#ccc', padding: '8px 12px', cursor: 'pointer' },
     logoutBtn: { backgroundColor: '#333', color: '#ccc', border: '1px solid #555', padding: '5px 10px', borderRadius: '3px', cursor: 'pointer' },
-    
-    // 👇 เพิ่มสไตล์ปุ่ม Login / Register
     loginBtn: { backgroundColor: 'transparent', color: '#fff', border: '1px solid #fff', padding: '6px 15px', borderRadius: '3px', cursor: 'pointer', marginRight: '10px', fontSize: '12px', fontWeight: 'bold' },
     registerBtn: { backgroundColor: '#fff', color: '#000', border: 'none', padding: '7px 15px', borderRadius: '3px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' },
-
-    // Layout
     mainLayout: { maxWidth: '1200px', margin: '20px auto', display: 'flex', gap: '20px', padding: '0 20px' },
     leftColumn: { flex: 3 },
     rightColumn: { flex: 1 },
@@ -356,7 +347,25 @@ const styles: {[key: string]: React.CSSProperties} = {
     sidebarInfo: { overflow: 'hidden' },
     sidebarTitle: { color: '#4caf50', fontWeight: 'bold', fontSize: '13px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
     sidebarMeta: { color: '#666', fontSize: '11px', marginTop: '2px' },
-    badge: { backgroundColor: '#444', color: '#fff', padding: '2px 6px', borderRadius: '3px', fontSize: '11px', marginLeft: '10px' }
+    badge: { backgroundColor: '#444', color: '#fff', padding: '2px 6px', borderRadius: '3px', fontSize: '11px', marginLeft: '10px' },
+    
+    // Warning Banner Style
+    warningBanner: {
+        backgroundColor: '#2c2c2c',
+        border: '1px solid #444',
+        color: '#ccc',
+        padding: '10px 15px',
+        borderRadius: '4px',
+        marginBottom: '20px',
+        fontSize: '13px',
+        display: 'flex',
+        alignItems: 'center'
+    },
+    link: {
+        color: '#64b5f6',
+        cursor: 'pointer',
+        textDecoration: 'underline'
+    }
 };
 
 export default Dashboard;
