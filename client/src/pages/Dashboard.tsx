@@ -429,7 +429,7 @@ const Dashboard = () => {
           </div>
         ) : (
           <div style={{ marginTop: 16 }}>
-            <Button type="primary" onClick={handleCreate} size="large">Create as Guest</Button>
+            <label>Sign in to create snippet!</label>
           </div>
         )}
       </Card>
