@@ -3,10 +3,13 @@ import {
   UnauthorizedException,
   ConflictException,
   InternalServerErrorException,
-} from '@nestjs/common';
-import { UsersService } from '../users/users.service';
-import { JwtService } from '@nestjs/jwt';
-import * as bcrypt from 'bcrypt';
+} from "@nestjs/common";
+import { UsersService } from "../users/users.service";
+import { JwtService } from "@nestjs/jwt";
+import * as bcrypt from "bcrypt";
+import { User } from "../users/entities/user.entity";
+
+type UserWithoutPassword = Omit<User, "password">;
 
 @Injectable()
 export class AuthService {
@@ -15,7 +18,10 @@ export class AuthService {
     private jwtService: JwtService,
   ) {}
 
-  async validateUser(username: string, pass: string): Promise<any> {
+  async validateUser(
+    username: string,
+    pass: string,
+  ): Promise<UserWithoutPassword | null> {
     const user = await this.usersService.findByUsername(username);
     if (user && (await bcrypt.compare(pass, user.password))) {
       const { password, ...result } = user;
@@ -24,11 +30,15 @@ export class AuthService {
     return null;
   }
 
-  async login(user: any) {
+  async login(user: UserWithoutPassword) {
     const payload = { username: user.username, sub: user.id, role: user.role };
     return {
       accessToken: this.jwtService.sign(payload),
-      user: { id: user.id, username: user.username, role: user.role },
+      user: {
+        id: user.id,
+        username: user.username,
+        role: user.role,
+      },
     };
   }
 
@@ -40,8 +50,8 @@ export class AuthService {
       const user = await this.usersService.create(username, hash);
       return user;
     } catch (error) {
-      if (error.code === '23505') {
-        throw new ConflictException('Username already taken');
+      if (error.code === "23505") {
+        throw new ConflictException("Username already taken");
       }
       throw new InternalServerErrorException();
     }

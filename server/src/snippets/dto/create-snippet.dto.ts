@@ -1,10 +1,17 @@
-import { IsNotEmpty, IsString, IsEnum, IsArray, IsOptional, MaxLength } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsString,
+  IsEnum,
+  IsArray,
+  IsOptional,
+  MaxLength,
+} from "class-validator";
 
-export class CreateSnippetDto{
+export class CreateSnippetDto {
   @IsString()
   @IsNotEmpty()
-  @MaxLength(100) // Good practice to limit titles
-  title: string;  // <--- ADD THIS
+  @MaxLength(100)
+  title: string;
 
   @IsString()
   @IsNotEmpty()
@@ -14,10 +21,10 @@ export class CreateSnippetDto{
   @IsNotEmpty()
   language: string;
 
-  @IsEnum(['PUBLIC', 'PRIVATE'])
-  visibility: 'PUBLIC' | 'PRIVATE';
+  @IsEnum(["PUBLIC", "PRIVATE"])
+  visibility: "PUBLIC" | "PRIVATE";
 
   @IsArray()
-  @IsString({ each: true }) // Ensures every item in the array is a string
+  @IsString({ each: true })
   tags: string[];
 }

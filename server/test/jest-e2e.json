@@ -5,5 +5,12 @@
   "testRegex": ".e2e-spec.ts$",
   "transform": {
     "^.+\\.(t|j)s$": "ts-jest"
-  }
+  },
+  "collectCoverageFrom": [
+    "../src/**/*.(t|j)s",
+    "!../src/**/*.module.ts",
+    "!../src/**/*.dto.ts",
+    "!../src/main.ts",
+    "!../src/**/entities/*.ts"
+  ]
 }
