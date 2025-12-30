@@ -7,31 +7,56 @@ import { User } from "../users/entities/user.entity";
 import { NotFoundException, ForbiddenException } from "@nestjs/common";
 import { Repository } from "typeorm";
 
-const mockUser = { id: 1, username: "owner", role: "USER" } as User;
-const mockAdmin = { id: 99, username: "admin", role: "ADMIN" } as User;
-const mockHacker = { id: 666, username: "hacker", role: "USER" } as User;
+const mockUser = {
+  id: 1,
+  username: "owner",
+  role: "USER",
+} as User;
 
-const mockTag = { id: 1, name: "typescript" } as Tag;
+const mockAdmin = {
+  id: 99,
+  username: "admin",
+  role: "ADMIN",
+} as User;
 
-const mockSnippetPublic = {
+const mockHacker = {
+  id: 666,
+  username: "hacker",
+  role: "USER",
+} as User;
+
+const mockTag = {
+  id: 1,
+  name: "typescript",
+} as Tag;
+
+const mockSnippetPublic: Snippet = {
   id: "1241as",
   title: "Public",
+  content: 'console.log("hello world");',
+  language: "javascript",
   visibility: "PUBLIC",
   author: mockUser,
   authorId: mockUser.id,
   tags: [mockTag],
   likes: [],
-} as Snippet;
+  createdAt: new Date(),
+  updatedAt: new Date(),
+};
 
-const mockSnippetPrivate = {
+const mockSnippetPrivate: Snippet = {
   id: "priv123",
   title: "Private",
+  content: "secret_key = 12345",
+  language: "python",
   visibility: "PRIVATE",
   author: mockUser,
   authorId: mockUser.id,
   tags: [],
   likes: [],
-} as Snippet;
+  createdAt: new Date(),
+  updatedAt: new Date(),
+};
 
 describe("SnippetsService", () => {
   let service: SnippetsService;
@@ -74,27 +99,36 @@ describe("SnippetsService", () => {
         title: "Test",
         content: "c",
         language: "ts",
-        visibility: "PUBLIC" as any,
+        visibility: "PUBLIC" as const,
         tags: ["TypeScript", "NESTJS"],
       };
 
       jest.spyOn(tagRepo, "findOneBy").mockResolvedValueOnce(mockTag);
       jest.spyOn(tagRepo, "findOneBy").mockResolvedValueOnce(null);
-      jest
-        .spyOn(tagRepo, "create")
-        .mockReturnValue({ id: 2, name: "nestjs" } as Tag);
-      jest
-        .spyOn(tagRepo, "save")
-        .mockResolvedValue({ id: 2, name: "nestjs" } as Tag);
 
-      jest
-        .spyOn(snippetRepo, "create")
-        .mockImplementation((data) => data as Snippet);
-      jest
-        .spyOn(snippetRepo, "save")
-        .mockResolvedValue({ id: "newId", ...dto } as any);
+      jest.spyOn(tagRepo, "create").mockReturnValue({
+        id: 2,
+        name: "nestjs",
+      } as Tag);
 
-      const result = await service.create(dto, mockUser);
+      jest.spyOn(tagRepo, "save").mockResolvedValue({
+        id: 2,
+        name: "nestjs",
+      } as Tag);
+
+      const createdSnippet: Snippet = {
+        ...mockSnippetPublic,
+        ...dto,
+        id: "newId",
+        author: mockUser,
+        authorId: mockUser.id,
+        tags: [mockTag, { id: 2, name: "nestjs" } as Tag],
+      };
+
+      jest.spyOn(snippetRepo, "create").mockReturnValue(createdSnippet);
+      jest.spyOn(snippetRepo, "save").mockResolvedValue(createdSnippet);
+
+      await service.create(dto, mockUser);
 
       expect(tagRepo.findOneBy).toHaveBeenCalledWith({ name: "typescript" });
       expect(tagRepo.findOneBy).toHaveBeenCalledWith({ name: "nestjs" });
@@ -116,16 +150,15 @@ describe("SnippetsService", () => {
 
     it("should allow Guest to view PUBLIC snippet", async () => {
       jest.spyOn(snippetRepo, "findOne").mockResolvedValue(mockSnippetPublic);
-      const result = await service.findOne("pub123", null);
+      const result = await service.findOne("pub123", null as unknown as User);
       expect(result).toEqual(mockSnippetPublic);
     });
 
     it("should BLOCK Guest from viewing PRIVATE snippet", async () => {
       jest.spyOn(snippetRepo, "findOne").mockResolvedValue(mockSnippetPrivate);
-
-      await expect(service.findOne("priv123", null)).rejects.toThrow(
-        ForbiddenException,
-      );
+      await expect(
+        service.findOne("priv123", null as unknown as User),
+      ).rejects.toThrow(ForbiddenException);
     });
 
     it("should BLOCK Hacker from viewing PRIVATE snippet", async () => {
@@ -153,13 +186,17 @@ describe("SnippetsService", () => {
       jest
         .spyOn(snippetRepo, "find")
         .mockResolvedValue([mockSnippetPublic, mockSnippetPrivate]);
+
       await service.findAll(mockAdmin);
+
       expect(snippetRepo.find).toHaveBeenCalledWith(
         expect.objectContaining({ order: { createdAt: "DESC" } }),
       );
     });
 
     it("should return PUBLIC + OWN for User", async () => {
+      jest.spyOn(snippetRepo, "find").mockResolvedValue([]);
+
       await service.findAll(mockUser);
       expect(snippetRepo.find).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -169,7 +206,10 @@ describe("SnippetsService", () => {
     });
 
     it("should return only PUBLIC for Guest", async () => {
-      await service.findAll(null);
+      jest.spyOn(snippetRepo, "find").mockResolvedValue([]);
+
+      await service.findAll(null as unknown as User);
+
       expect(snippetRepo.find).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { visibility: "PUBLIC" },
@@ -226,7 +266,8 @@ describe("SnippetsService", () => {
 
   describe("toggleLike", () => {
     it("should ADD like if not present", async () => {
-      const snippetNoLikes = { ...mockSnippetPublic, likes: [] };
+      const snippetNoLikes: Snippet = { ...mockSnippetPublic, likes: [] };
+
       jest.spyOn(snippetRepo, "findOne").mockResolvedValue(snippetNoLikes);
       jest
         .spyOn(snippetRepo, "save")
@@ -239,7 +280,11 @@ describe("SnippetsService", () => {
     });
 
     it("should REMOVE like if already present", async () => {
-      const snippetWithLike = { ...mockSnippetPublic, likes: [mockUser] };
+      const snippetWithLike: Snippet = {
+        ...mockSnippetPublic,
+        likes: [mockUser],
+      };
+
       jest.spyOn(snippetRepo, "findOne").mockResolvedValue(snippetWithLike);
       jest
         .spyOn(snippetRepo, "save")
