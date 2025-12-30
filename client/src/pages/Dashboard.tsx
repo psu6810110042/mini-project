@@ -9,298 +9,354 @@ const Dashboard = () => {
   const [codes, setCodes] = useState<CodeSnippet[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
-  // --- State สำหรับการสร้างโพสต์ใหม่ (Create) ---
-  const [showCreate, setShowCreate] = useState(false);
+  // --- State สำหรับ Create/Edit ---
   const [newTitle, setNewTitle] = useState("");
   const [newContent, setNewContent] = useState("");
   const [newLang, setNewLang] = useState("javascript");
   const [newVisibility, setNewVisibility] = useState<'PUBLIC'|'PRIVATE'>('PUBLIC');
-  const [newTags, setNewTags] = useState(""); // รับเป็น string แล้วค่อย split ,
+  const [newTags, setNewTags] = useState("");
 
-  // --- State สำหรับการแก้ไข (Edit) ---
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editTitle, setEditTitle] = useState("");
-  const [editContent, setEditContent] = useState("");
+  const [selectedCode, setSelectedCode] = useState<CodeSnippet | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
 
   useEffect(() => {
-    // โหลด User และ Token
-    const storedToken = localStorage.getItem('token');
-    const storedUserStr = localStorage.getItem('user'); // ต้องมั่นใจว่าตอน Login เก็บ user ไว้แล้ว
-    
-    // ถ้าไม่มี Token ดีดออก
-    if (!storedToken) {
-        navigate('/login');
-        return;
+    // 1. ลองดึง User จาก LocalStorage (ถ้ามี)
+    const storedUserStr = localStorage.getItem('user');
+    if (storedUserStr) { 
+        try { 
+            setCurrentUser(JSON.parse(storedUserStr)); 
+        } catch (e) { 
+            console.error(e); 
+        } 
     }
+    // ❌ ลบโค้ดที่ดีดไปหน้า Login ทิ้งไปแล้ว (เพื่อให้ Guest เข้าได้)
 
-    // ถ้ามี User ใน LocalStorage ให้ดึงมาใช้
-    if (storedUserStr) {
-        try {
-            setCurrentUser(JSON.parse(storedUserStr));
-        } catch (e) {
-            console.error("User parse error", e);
-        }
-    }
-
+    // 2. โหลดข้อมูล Code
     fetchData();
-  }, [navigate]);
+  }, []);
 
   const fetchData = async () => {
     const data = await getCodes();
-    if (Array.isArray(data)) {
-        setCodes(data);
+    if (Array.isArray(data)) setCodes(data);
+  };
+
+  const handleLogout = () => { localStorage.clear(); navigate('/login'); };
+
+  // --- Actions ---
+  const handleCreate = async () => {
+    // ✅ เช็คก่อนสร้าง: ถ้ายังไม่ล็อกอิน ให้ไปหน้า Login
+    if (!currentUser) {
+        if(confirm("ต้องเข้าสู่ระบบก่อนสร้าง Code ครับ\nไปหน้า Login เลยไหม?")) {
+            navigate('/login');
+        }
+        return;
     }
-  };
 
-  const handleLogout = () => {
-    localStorage.clear();
-    navigate('/login');
-  };
-
-  // --- 1. สร้าง Code ใหม่ ---
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
+    if (!newContent) return alert("กรุณาใส่เนื้อหา Code");
     try {
-        // แปลง Tags จาก "react, js" -> ["react", "js"]
         const tagsArray = newTags.split(',').map(t => t.trim()).filter(t => t !== "");
-
         await createCodeService({
-            title: newTitle,
+            title: newTitle || "Untitled",
             content: newContent,
             language: newLang,
             visibility: newVisibility,
             tags: tagsArray
         });
-        
-        // Reset Form & Refresh Data
-        setNewTitle(""); setNewContent(""); setNewTags(""); setShowCreate(false);
-        fetchData(); 
-        alert("สร้าง Code สำเร็จ!");
-    } catch (err: any) {
-        alert("สร้างไม่สำเร็จ: " + err.message);
-    }
+        setNewTitle(""); setNewContent(""); setNewTags(""); 
+        fetchData();
+        alert("Paste created!");
+    } catch (err: any) { alert("Error: " + err.message); }
   };
 
-  // --- 2. กด Like ---
-  const handleLike = async (id: string) => {
-      try {
-          await likeCodeService(id);
-          fetchData(); // โหลดใหม่เพื่อให้เห็นจำนวนไลก์ล่าสุด
-      } catch (err: any) {
-          alert("Error: " + err.message);
-      }
+  const handleUpdate = async () => {
+    if (!selectedCode) return;
+    try {
+        await updateCodeService(selectedCode.id, { 
+            title: selectedCode.title, 
+            content: selectedCode.content 
+        });
+        setIsEditing(false);
+        fetchData();
+        alert("Updated!");
+    } catch (err) { alert("Update failed"); }
   };
 
-  // --- 3. ลบ Code ---
   const handleDelete = async (id: string) => {
-      if (!confirm("ยืนยันการลบ?")) return;
-      try {
+    if (!confirm("Delete this paste?")) return;
+    try {
         await deleteCodeService(id);
+        setSelectedCode(null);
         fetchData();
-      } catch (err) {
-        alert("ลบไม่สำเร็จ (คุณอาจไม่ใช่เจ้าของ หรือ Admin)");
+    } catch (err) { alert("Delete failed"); }
+  };
+
+  const handleLike = async (id: string) => {
+      // ✅ เช็คก่อน Like
+      if (!currentUser) {
+          alert("กรุณาเข้าสู่ระบบเพื่อกด Like");
+          return;
+      }
+      await likeCodeService(id);
+      fetchData();
+      if (selectedCode && selectedCode.id === id) {
+         const updatedList = await getCodes();
+         const updatedItem = updatedList.find(c => c.id === id);
+         if (updatedItem) setSelectedCode(updatedItem);
       }
   };
 
-  // --- 4. เริ่มแก้ไข / บันทึก ---
-  const startEdit = (code: CodeSnippet) => {
-      setEditingId(code.id);
-      setEditTitle(code.title);
-      setEditContent(code.content);
-  };
-
-  const saveEdit = async (id: string) => {
-      try {
-        await updateCodeService(id, { title: editTitle, content: editContent });
-        setEditingId(null);
-        fetchData();
-      } catch (err) {
-        alert("แก้ไขไม่สำเร็จ");
-      }
+  const resetToCreateMode = () => {
+      setSelectedCode(null);
+      setIsEditing(false);
   };
 
   return (
-    <div style={{ padding: '20px', maxWidth: '800px', margin: 'auto', fontFamily: 'Arial, sans-serif' }}>
+    <div style={styles.pageContainer}>
       
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <h2>💻 Code Sharing Feed</h2>
-        <div>
-           <span style={{marginRight: '15px', color: '#555'}}>
-             User: <strong>{currentUser?.username}</strong> ({currentUser?.role})
-           </span>
-           <button onClick={handleLogout} style={styles.logoutBtn}>Logout</button>
-        </div>
-      </div>
-
-      {/* ปุ่มเปิดฟอร์มสร้างโพสต์ */}
-      <button 
-        onClick={() => setShowCreate(!showCreate)} 
-        style={showCreate ? styles.cancelBtn : styles.createBtn}
-      >
-        {showCreate ? '❌ ปิดหน้าต่างสร้าง' : '➕ เขียน Code ใหม่'}
-      </button>
-
-      {/* Form สร้างโพสต์ (แสดงเมื่อกดปุ่ม) */}
-      {showCreate && (
-          <form onSubmit={handleCreate} style={styles.createForm}>
-              <h3>สร้าง Snippet ใหม่</h3>
-              <input 
-                placeholder="หัวข้อ Code (Title)" 
-                value={newTitle} 
-                onChange={e => setNewTitle(e.target.value)} 
-                required 
-                style={styles.input}
-              />
-              <div style={{display: 'flex', gap: '10px', marginBottom: '10px'}}>
-                <select value={newLang} onChange={e => setNewLang(e.target.value)} style={styles.input}>
-                    <option value="javascript">JavaScript</option>
-                    <option value="typescript">TypeScript</option>
-                    <option value="python">Python</option>
-                    <option value="html">HTML</option>
-                </select>
-                <select value={newVisibility} onChange={e => setNewVisibility(e.target.value as any)} style={styles.input}>
-                    <option value="PUBLIC">Public</option>
-                    <option value="PRIVATE">Private</option>
-                </select>
-              </div>
-              <input 
-                placeholder="Tags (คั่นด้วยจุลภาค เช่น react, web)" 
-                value={newTags} 
-                onChange={e => setNewTags(e.target.value)} 
-                style={styles.input}
-              />
-              <textarea 
-                placeholder="วาง Code ที่นี่..." 
-                value={newContent} 
-                onChange={e => setNewContent(e.target.value)} 
-                required 
-                rows={5}
-                style={styles.textarea}
-              />
-              <button type="submit" style={styles.submitBtn}>โพสต์เลย 🚀</button>
-          </form>
-      )}
-
-      <hr style={{margin: '20px 0', border: 'none', borderTop: '1px solid #eee'}}/>
-
-      {/* รายการ Code (Feed) */}
-      {codes.length === 0 && <p style={{textAlign:'center', color:'#888'}}>ยังไม่มีข้อมูล หรือกำลังโหลด...</p>}
-
-      {codes.map((item) => {
-        // ✅ เช็คสิทธิ์: เป็นเจ้าของ หรือ Admin
-        const isOwner = currentUser?.id === item.author.id;
-        const isAdmin = currentUser?.role === 'ADMIN';
-        const canManage = isOwner || isAdmin;
-        const canEdit = isOwner || isAdmin; // ตาม Backend: Admin แก้ได้, Author แก้ได้
-
-        // ✅ เช็คว่าเรากด Like ไปยัง (ดูใน array likes)
-        const isLiked = item.likes.some(u => u.id === currentUser?.id);
-        const isEditing = editingId === item.id;
-
-        return (
-            <div key={item.id} style={styles.card}>
+      {/* 1. NAVBAR */}
+      <nav style={styles.navbar}>
+        <div style={styles.navContent}>
+            <div style={{display: 'flex', alignItems: 'center', gap: '20px'}}>
+                <h1 style={styles.logo} onClick={resetToCreateMode}>NESTBIN<span style={{fontSize:'12px', color:'#ccc'}}> clone</span></h1>
+                {/* ปุ่ม New Paste จะกดได้ไหม? ถ้าเป็น Guest กดแล้วจะไปฟังก์ชัน handleCreate ซึ่งเราดัก Login ไว้แล้ว */}
+                <button style={styles.navBtn} onClick={resetToCreateMode}>+ New Paste</button>
+            </div>
             
-            {/* --- Title Section --- */}
-            <div style={{display: 'flex', justifyContent: 'space-between'}}>
-                {isEditing ? (
-                    <input 
-                        value={editTitle} 
-                        onChange={(e) => setEditTitle(e.target.value)}
-                        style={{...styles.input, marginBottom: 0}}
-                    />
+            <div style={styles.searchBarContainer}>
+                <input placeholder="Search..." style={styles.searchInput} />
+                <button style={styles.searchBtn}>🔍</button>
+            </div>
+
+            {/* ✅ ส่วนขวาบน: เช็คว่ามี User ไหม? */}
+            <div style={{display: 'flex', alignItems: 'center', gap: '15px'}}>
+                {currentUser ? (
+                    // กรณี Login แล้ว
+                    <>
+                        <span style={{color: '#ccc', fontSize: '14px'}}>Welcome, <b>{currentUser.username}</b></span>
+                        <button onClick={handleLogout} style={styles.logoutBtn}>Sign out</button>
+                    </>
                 ) : (
-                    <h3 style={{margin: '0 0 5px 0', color: '#333'}}>
-                        {item.title} 
-                        <span style={styles.badge}>{item.language}</span>
-                        {item.visibility === 'PRIVATE' && <span style={styles.privateBadge}>🔒 Private</span>}
+                    // กรณี Guest (ยังไม่ Login)
+                    <>
+                        <button onClick={() => navigate('/login')} style={styles.loginBtn}>Login</button>
+                        <button onClick={() => navigate('/register')} style={styles.registerBtn}>Register</button>
+                    </>
+                )}
+            </div>
+        </div>
+      </nav>
+
+      {/* 2. MAIN LAYOUT */}
+      <div style={styles.mainLayout}>
+        
+        {/* --- LEFT COLUMN: Editor --- */}
+        <div style={styles.leftColumn}>
+            
+            <div style={styles.editorHeader}>
+                {selectedCode ? (
+                    <h3>
+                        {isEditing ? 'Editing Paste' : selectedCode.title}
+                        {!isEditing && <span style={styles.badge}>{selectedCode.language}</span>}
                     </h3>
+                ) : (
+                    <h3>New Paste</h3>
                 )}
             </div>
 
-            {/* --- Tags --- */}
-            <div style={{ marginBottom: '10px' }}>
-                {item.tags.map(tag => (
-                  <span key={tag.id} style={styles.tag}>#{tag.name}</span>
-                ))}
+            <div style={styles.editorContainer}>
+                {selectedCode && !isEditing ? (
+                    // VIEW MODE
+                    <pre style={styles.codeView}>
+                        <code>{selectedCode.content}</code>
+                    </pre>
+                ) : (
+                    // CREATE / EDIT MODE
+                    <textarea 
+                        style={styles.textarea}
+                        placeholder={currentUser ? "Paste your code here..." : "กรุณาเข้าสู่ระบบเพื่อเขียน Code..."}
+                        value={selectedCode && isEditing ? selectedCode.content : newContent}
+                        onChange={e => {
+                            if (isEditing && selectedCode) setSelectedCode({...selectedCode, content: e.target.value});
+                            else setNewContent(e.target.value);
+                        }}
+                        // อาจจะ disable ถ้าเป็น Guest ก็ได้ แต่ปล่อยไว้ให้พิมพ์เล่นแต่กด Create ไม่ได้ก็น่าจะดีกว่า
+                    />
+                )}
             </div>
 
-            {/* --- Code Content --- */}
-            {isEditing ? (
-                <textarea 
-                    value={editContent} 
-                    onChange={(e) => setEditContent(e.target.value)}
-                    rows={6}
-                    style={styles.textarea}
-                />
-            ) : (
-                <pre style={styles.codeBlock}>
-                    <code>{item.content}</code>
-                </pre>
+            {/* Settings Area */}
+            {(!selectedCode || isEditing) && (
+                <div style={styles.settingsPanel}>
+                    <h4 style={{color: '#fff', borderBottom:'1px solid #444', paddingBottom:'5px'}}>Optional Paste Settings</h4>
+                    
+                    {/* ... (Inputs เหมือนเดิม) ... */}
+                    <div style={styles.formGroup}>
+                        <label style={styles.label}>Paste Title:</label>
+                        <input 
+                            style={styles.input} 
+                            value={selectedCode && isEditing ? selectedCode.title : newTitle}
+                            onChange={e => {
+                                if (isEditing && selectedCode) setSelectedCode({...selectedCode, title: e.target.value});
+                                else setNewTitle(e.target.value);
+                            }}
+                        />
+                    </div>
+
+                    <div style={styles.row}>
+                        <div style={{...styles.formGroup, flex:1}}>
+                            <label style={styles.label}>Syntax Highlight:</label>
+                            <select 
+                                style={styles.select}
+                                value={newLang}
+                                onChange={e => setNewLang(e.target.value)}
+                                disabled={isEditing} 
+                            >
+                                <option value="javascript">JavaScript</option>
+                                <option value="typescript">TypeScript</option>
+                                <option value="python">Python</option>
+                                <option value="text">None (Text)</option>
+                            </select>
+                        </div>
+                        <div style={{...styles.formGroup, flex:1}}>
+                            <label style={styles.label}>Paste Exposure:</label>
+                            <select 
+                                style={styles.select}
+                                value={newVisibility}
+                                onChange={e => setNewVisibility(e.target.value as any)}
+                                disabled={isEditing}
+                            >
+                                <option value="PUBLIC">Public</option>
+                                <option value="PRIVATE">Private</option>
+                            </select>
+                        </div>
+                    </div>
+                     <div style={styles.formGroup}>
+                        <label style={styles.label}>Tags:</label>
+                        <input 
+                            style={styles.input} 
+                            placeholder="react, api, tutorial"
+                            value={newTags}
+                            onChange={e => setNewTags(e.target.value)}
+                            disabled={isEditing}
+                        />
+                    </div>
+                    
+                    <div style={{marginTop: '20px'}}>
+                        {isEditing ? (
+                            <>
+                                <button style={styles.primaryBtn} onClick={handleUpdate}>Save Changes</button>
+                                <button style={styles.secondaryBtn} onClick={() => setIsEditing(false)}>Cancel</button>
+                            </>
+                        ) : (
+                            <button style={styles.primaryBtn} onClick={handleCreate}>Create New Paste</button>
+                        )}
+                    </div>
+                </div>
             )}
 
-            {/* --- Footer (Author & Actions) --- */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '15px' }}>
-                
-                <div style={{display: 'flex', alignItems: 'center', gap: '10px'}}>
-                    <button onClick={() => handleLike(item.id)} style={styles.likeBtn}>
-                        {isLiked ? '❤️' : '🤍'} {item.likes.length}
-                    </button>
-                    <span style={{ fontSize: '12px', color: '#666' }}>
-                        By: <b>{item.author.username}</b> 
-                        <span style={{marginLeft: '5px', color:'#999'}}>
-                             ({new Date(item.createdAt).toLocaleDateString()})
+            {/* Actions Bar (Like/Edit/Delete) */}
+            {selectedCode && !isEditing && (
+                <div style={styles.actionBar}>
+                    <div style={{display:'flex', gap:'10px'}}>
+                        <button style={styles.actionBtn} onClick={() => handleLike(selectedCode.id)}>
+                            {/* เช็ค currentUser ก่อน render ปุ่มไลก์ หรือกดแล้วค่อยเช็คก็ได้ */}
+                            {currentUser && selectedCode.likes.some(u => u.id === currentUser.id) ? '❤️' : '🤍'} Like ({selectedCode.likes.length})
+                        </button>
+                        <span style={{color:'#888', fontSize:'12px', alignSelf:'center'}}>
+                            By {selectedCode.author.username} • {new Date(selectedCode.createdAt).toLocaleDateString()}
                         </span>
-                    </span>
-                </div>
-
-                <div>
-                    {isEditing ? (
-                        <>
-                            <button onClick={() => saveEdit(item.id)} style={styles.saveBtn}>💾 Save</button>
-                            <button onClick={() => setEditingId(null)} style={styles.cancelActionBtn}>❌</button>
-                        </>
-                    ) : (
-                        <>
-                            {canEdit && (
-                                <button onClick={() => startEdit(item)} style={styles.editBtn}>✏️</button>
-                            )}
-                            {canManage && (
-                                <button onClick={() => handleDelete(item.id)} style={styles.deleteBtn}>🗑️</button>
-                            )}
-                        </>
+                    </div>
+                    
+                    {(currentUser?.id === selectedCode.author.id || currentUser?.role === 'ADMIN') && (
+                        <div>
+                            <button style={{...styles.actionBtn, color: '#fb8c00'}} onClick={() => setIsEditing(true)}>Edit</button>
+                            <button style={{...styles.actionBtn, color: '#ff5252'}} onClick={() => handleDelete(selectedCode.id)}>Delete</button>
+                        </div>
                     )}
                 </div>
+            )}
+
+        </div>
+
+        {/* --- RIGHT COLUMN: Sidebar --- */}
+        <div style={styles.rightColumn}>
+            <div style={styles.sidebarHeader}>Public Pastes</div>
+            <div style={styles.sidebarList}>
+                {codes.map(code => (
+                    <div 
+                        key={code.id} 
+                        style={{
+                            ...styles.sidebarItem, 
+                            backgroundColor: selectedCode?.id === code.id ? '#333' : 'transparent'
+                        }}
+                        onClick={() => {
+                            setSelectedCode(code);
+                            setIsEditing(false);
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                        }}
+                    >
+                        <div style={styles.sidebarIcon}>
+                            {code.visibility === 'PRIVATE' ? '🔒' : '🌍'}
+                        </div>
+                        <div style={styles.sidebarInfo}>
+                            <div style={styles.sidebarTitle}>{code.title || "Untitled"}</div>
+                            <div style={styles.sidebarMeta}>
+                                {code.language} | {new Date(code.createdAt).toLocaleTimeString()}
+                            </div>
+                        </div>
+                    </div>
+                ))}
             </div>
-            </div>
-        );
-      })}
+        </div>
+
+      </div>
     </div>
   );
 };
 
-// CSS Styles (Inline เพื่อความง่ายในการ Copy)
-const styles = {
-    card: { border: '1px solid #ddd', padding: '20px', marginBottom: '20px', borderRadius: '12px', background: '#fff', boxShadow: '0 2px 5px rgba(0,0,0,0.05)' },
-    createForm: { background: '#f9f9f9', padding: '20px', borderRadius: '10px', marginBottom: '20px', border: '1px solid #eee' },
-    input: { width: '100%', padding: '10px', marginBottom: '10px', borderRadius: '5px', border: '1px solid #ccc', boxSizing: 'border-box' as const },
-    textarea: { width: '100%', padding: '10px', fontFamily: 'monospace', borderRadius: '5px', border: '1px solid #ccc', backgroundColor: '#fff', boxSizing: 'border-box' as const },
-    codeBlock: { backgroundColor: '#282c34', color: '#abb2bf', padding: '15px', borderRadius: '8px', overflowX: 'auto' as const, fontSize: '14px' },
-    tag: { backgroundColor: '#e1f5fe', color: '#0277bd', padding: '3px 8px', borderRadius: '4px', marginRight: '5px', fontSize: '12px' },
-    badge: { backgroundColor: '#eee', color: '#333', fontSize: '10px', padding: '2px 5px', borderRadius: '3px', marginLeft: '8px', verticalAlign: 'middle' },
-    privateBadge: { backgroundColor: '#ffebee', color: '#c62828', fontSize: '10px', padding: '2px 5px', borderRadius: '3px', marginLeft: '5px', verticalAlign: 'middle' },
+// --- CSS Styles (เพิ่มปุ่ม Login/Register) ---
+const styles: {[key: string]: React.CSSProperties} = {
+    // ... (Styles เดิมทั้งหมด ให้คงไว้เหมือนเดิม) ...
+    pageContainer: { backgroundColor: '#181818', minHeight: '100vh', color: '#e0e0e0', fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif" },
+    navbar: { backgroundColor: '#222', borderBottom: '1px solid #333', padding: '10px 0', position: 'sticky', top: 0, zIndex: 100 },
+    navContent: { maxWidth: '1200px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 20px' },
+    logo: { margin: 0, fontSize: '24px', fontWeight: 'bold', color: '#fff', letterSpacing: '1px', cursor: 'pointer' },
+    navBtn: { backgroundColor: '#4caf50', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '3px', cursor: 'pointer', fontWeight: 'bold', fontSize: '12px', textTransform: 'uppercase' },
+    searchBarContainer: { display: 'flex', alignItems: 'center', backgroundColor: '#333', borderRadius: '3px', overflow: 'hidden' },
+    searchInput: { backgroundColor: 'transparent', border: 'none', color: '#fff', padding: '8px', outline: 'none', minWidth: '300px' },
+    searchBtn: { backgroundColor: '#444', border: 'none', color: '#ccc', padding: '8px 12px', cursor: 'pointer' },
+    logoutBtn: { backgroundColor: '#333', color: '#ccc', border: '1px solid #555', padding: '5px 10px', borderRadius: '3px', cursor: 'pointer' },
     
-    // Buttons
-    createBtn: { width: '100%', padding: '12px', backgroundColor: '#007bff', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', fontSize: '16px', fontWeight: 'bold' as const },
-    cancelBtn: { width: '100%', padding: '12px', backgroundColor: '#6c757d', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', fontSize: '16px' },
-    submitBtn: { padding: '10px 20px', backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold' as const },
-    logoutBtn: { backgroundColor: '#ff4d4f', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer' },
-    
-    likeBtn: { background: 'none', border: '1px solid #ddd', padding: '5px 10px', borderRadius: '20px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' },
-    editBtn: { backgroundColor: '#ffc107', border: 'none', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer', marginRight: '5px' },
-    deleteBtn: { backgroundColor: '#dc3545', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer' },
-    saveBtn: { backgroundColor: '#28a745', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer', marginRight: '5px' },
-    cancelActionBtn: { backgroundColor: '#6c757d', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer' },
+    // 👇 เพิ่มสไตล์ปุ่ม Login / Register
+    loginBtn: { backgroundColor: 'transparent', color: '#fff', border: '1px solid #fff', padding: '6px 15px', borderRadius: '3px', cursor: 'pointer', marginRight: '10px', fontSize: '12px', fontWeight: 'bold' },
+    registerBtn: { backgroundColor: '#fff', color: '#000', border: 'none', padding: '7px 15px', borderRadius: '3px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' },
+
+    // Layout
+    mainLayout: { maxWidth: '1200px', margin: '20px auto', display: 'flex', gap: '20px', padding: '0 20px' },
+    leftColumn: { flex: 3 },
+    rightColumn: { flex: 1 },
+    editorHeader: { borderBottom: '1px solid #333', paddingBottom: '10px', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '10px' },
+    editorContainer: { marginBottom: '20px' },
+    textarea: { width: '100%', minHeight: '400px', backgroundColor: '#222', color: '#d4d4d4', border: '1px solid #333', padding: '15px', fontFamily: "'Consolas', 'Monaco', monospace", fontSize: '14px', resize: 'vertical', outline: 'none', boxSizing: 'border-box' },
+    codeView: { width: '100%', minHeight: '400px', backgroundColor: '#1e1e1e', color: '#d4d4d4', border: '1px solid #333', padding: '15px', fontFamily: "'Consolas', 'Monaco', monospace", fontSize: '14px', margin: 0, whiteSpace: 'pre-wrap', overflowWrap: 'break-word' },
+    settingsPanel: { backgroundColor: '#222', padding: '20px', border: '1px solid #333', borderRadius: '4px' },
+    row: { display: 'flex', gap: '20px' },
+    formGroup: { marginBottom: '15px' },
+    label: { display: 'block', color: '#888', marginBottom: '5px', fontSize: '13px', fontWeight: 'bold' },
+    input: { width: '100%', padding: '8px', backgroundColor: '#333', border: '1px solid #444', color: '#fff', borderRadius: '3px', boxSizing: 'border-box' },
+    select: { width: '100%', padding: '8px', backgroundColor: '#333', border: '1px solid #444', color: '#fff', borderRadius: '3px' },
+    primaryBtn: { backgroundColor: '#f1c40f', color: '#000', fontWeight: 'bold', padding: '10px 20px', border: 'none', borderRadius: '3px', cursor: 'pointer', fontSize: '14px' },
+    secondaryBtn: { backgroundColor: 'transparent', color: '#ccc', padding: '10px 20px', border: 'none', cursor: 'pointer', marginLeft: '10px' },
+    actionBar: { marginTop: '10px', padding: '15px', backgroundColor: '#222', border: '1px solid #333', display: 'flex', justifyContent: 'space-between' },
+    actionBtn: { background: 'none', border: 'none', color: '#ccc', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px' },
+    sidebarHeader: { fontSize: '14px', fontWeight: 'bold', color: '#888', textTransform: 'uppercase', borderBottom: '2px solid #4caf50', paddingBottom: '5px', marginBottom: '10px' },
+    sidebarList: { display: 'flex', flexDirection: 'column', gap: '5px' },
+    sidebarItem: { display: 'flex', gap: '10px', padding: '8px', borderBottom: '1px solid #222', cursor: 'pointer', borderRadius: '3px', transition: 'background 0.2s' },
+    sidebarIcon: { fontSize: '18px' },
+    sidebarInfo: { overflow: 'hidden' },
+    sidebarTitle: { color: '#4caf50', fontWeight: 'bold', fontSize: '13px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
+    sidebarMeta: { color: '#666', fontSize: '11px', marginTop: '2px' },
+    badge: { backgroundColor: '#444', color: '#fff', padding: '2px 6px', borderRadius: '3px', fontSize: '11px', marginLeft: '10px' }
 };
 
 export default Dashboard;
