@@ -8,13 +8,11 @@ export class AuthController {
     @UseInterceptors(ClassSerializerInterceptor)
     @Post('register')
     async register(@Body() body) {
-        // This calls the service to create a new user
         return this.authService.register(body.username, body.password);
     }
 
     @Post('login')
     async login(@Body() body) {
-        // This verifies credentials and returns the JWT
         const user = await this.authService.validateUser(body.username, body.password);
         if (!user) {
             return { message: 'Invalid credentials' };

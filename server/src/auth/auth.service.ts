@@ -28,7 +28,6 @@ export class AuthService {
   }
 
   async register(username: string, pass: string) {
-    // Hash the password before sending to UsersService
     const salt = await bcrypt.genSalt();
     const hash = await bcrypt.hash(pass, salt);
     return this.usersService.create(username, hash);
