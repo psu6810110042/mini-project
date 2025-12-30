@@ -16,18 +16,18 @@ const Dashboard = () => {
   const [codes, setCodes] = useState<CodeSnippet[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
-  // --- State สำหรับ Create/Edit ---
-  const [newTitle, setNewTitle] = useState("");
-  const [newContent, setNewContent] = useState("");
-  const [newLang, setNewLang] = useState("javascript");
-  const [newVisibility, setNewVisibility] = useState<"PUBLIC" | "PRIVATE">(
-    "PUBLIC",
-  );
-  const [newTags, setNewTags] = useState("");
+  // --- Unified State: ใช้ตัวแปรชุดเดียวทั้ง "สร้าง" และ "แก้ไข" ---
+  // แบบนี้จะจัดการง่ายกว่าแยก state ครับ
+  const [titleInput, setTitleInput] = useState("");
+  const [contentInput, setContentInput] = useState("");
+  const [langInput, setLangInput] = useState("javascript");
+  const [visibilityInput, setVisibilityInput] = useState<"PUBLIC" | "PRIVATE">("PUBLIC");
+  const [tagsInput, setTagsInput] = useState("");
 
   const [selectedCode, setSelectedCode] = useState<CodeSnippet | null>(null);
   const [isEditing, setIsEditing] = useState(false);
 
+  // 1. Load User
   useEffect(() => {
     const storedUserStr = localStorage.getItem("user");
     if (storedUserStr) {
@@ -37,6 +37,10 @@ const Dashboard = () => {
         console.error(e);
       }
     }
+  }, []);
+
+  // 2. Load Data & Handle URL ID
+  useEffect(() => {
     fetchData();
   }, [id]);
 
@@ -45,13 +49,11 @@ const Dashboard = () => {
     if (Array.isArray(data)) {
       setCodes(data);
 
-      // ✅ 4. เพิ่ม Logic: ถ้ามี id ใน URL ให้เลือก Snippet นั้นขึ้นมาโชว์เลย
+      // ถ้ามี ID ใน URL ให้เลือก Snippet นั้นมาโชว์
       if (id) {
         const foundSnippet = data.find((code) => code.id === id);
         if (foundSnippet) {
-          setSelectedCode(foundSnippet); // แสดงผลทันที
-          // เลื่อนหน้าจอขึ้นบนสุด (เผื่อดูในมือถือ)
-          window.scrollTo({ top: 0, behavior: "smooth" });
+          handleSelectCode(foundSnippet);
         }
       }
     }
@@ -62,28 +64,69 @@ const Dashboard = () => {
     navigate("/login");
   };
 
-  // --- Actions ---
-  const handleCreate = async () => {
-    if (!newContent) return alert("กรุณาใส่เนื้อหา Code");
+  // --- Helpers ---
 
-    const titleToSend = currentUser ? newTitle || "Untitled" : "Untitled";
-    const langToSend = currentUser ? newLang : "text";
+  // รีเซ็ตฟอร์มกลับไปหน้า "Create New Paste"
+  const resetToCreateMode = () => {
+    setSelectedCode(null);
+    setIsEditing(false);
+    // เคลียร์ค่า Input
+    setTitleInput("");
+    setContentInput("");
+    setLangInput("javascript");
+    setVisibilityInput("PUBLIC");
+    setTagsInput("");
+    navigate("/"); // ลบ ID ออกจาก URL
+  };
+
+  // เตรียมข้อมูลลงฟอร์มเมื่อกด "Edit"
+  const startEditMode = () => {
+    if (!selectedCode) return;
+    setIsEditing(true);
+
+    // ✅ ดึงค่าเก่ามาใส่ Input (แก้ปัญหาแก้ไขไม่ได้)
+    setTitleInput(selectedCode.title);
+    setContentInput(selectedCode.content);
+    setLangInput(selectedCode.language);
+    setVisibilityInput(selectedCode.visibility);
+
+    // ✅ แปลง Tags Object Array -> String (เช่น "react, js") เพื่อโชว์ใน Input
+    const tagsString = selectedCode.tags
+      ? selectedCode.tags.map((t) => t.name).join(", ")
+      : "";
+    setTagsInput(tagsString);
+  };
+
+  const handleSelectCode = (code: CodeSnippet) => {
+    setSelectedCode(code);
+    setIsEditing(false);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  // --- Actions ---
+
+  const handleCreate = async () => {
+    if (!contentInput) return alert("กรุณาใส่เนื้อหา Code");
+
+    const titleToSend = currentUser ? titleInput || "Untitled" : "Untitled";
+    const langToSend = currentUser ? langInput : "text";
 
     try {
-      const tagsArray = newTags
+      // แปลง String -> Array
+      const tagsArray = tagsInput
         .split(",")
         .map((t) => t.trim())
         .filter((t) => t !== "");
+
       await createCodeService({
         title: titleToSend,
-        content: newContent,
+        content: contentInput,
         language: langToSend,
-        visibility: newVisibility,
+        visibility: visibilityInput,
         tags: tagsArray,
       });
-      setNewTitle("");
-      setNewContent("");
-      setNewTags("");
+
+      resetToCreateMode();
       fetchData();
       alert("Paste created successfully!");
     } catch (err: any) {
@@ -94,12 +137,23 @@ const Dashboard = () => {
   const handleUpdate = async () => {
     if (!selectedCode) return;
     try {
+      // แปลง String -> Array สำหรับอัปเดต
+      const tagsArray = tagsInput
+        .split(",")
+        .map((t) => t.trim())
+        .filter((t) => t !== "");
+
+      // ✅ ส่งครบทุก field (แก้ปัญหาอัปเดตได้ไม่ครบ)
       await updateCodeService(selectedCode.id, {
-        title: selectedCode.title,
-        content: selectedCode.content,
+        title: titleInput,
+        content: contentInput,
+        language: langInput,
+        visibility: visibilityInput,
+        tags: tagsArray, 
       });
+
       setIsEditing(false);
-      fetchData();
+      fetchData(); 
       alert("Updated!");
     } catch (err) {
       alert("Update failed");
@@ -110,7 +164,7 @@ const Dashboard = () => {
     if (!confirm("Delete this paste?")) return;
     try {
       await deleteCodeService(id);
-      setSelectedCode(null);
+      resetToCreateMode();
       fetchData();
     } catch (err) {
       alert("Delete failed");
@@ -123,17 +177,14 @@ const Dashboard = () => {
       return;
     }
     await likeCodeService(id);
-    fetchData();
-    if (selectedCode && selectedCode.id === id) {
-      const updatedList = await getCodes();
-      const updatedItem = updatedList.find((c) => c.id === id);
-      if (updatedItem) setSelectedCode(updatedItem);
-    }
-  };
+    fetchData(); 
 
-  const resetToCreateMode = () => {
-    setSelectedCode(null);
-    setIsEditing(false);
+    // อัปเดต selectedCode ทันทีเพื่อให้เลข Like เปลี่ยน
+    const updatedList = await getCodes();
+    const updatedItem = updatedList.find((c) => c.id === id);
+    if (updatedItem && selectedCode?.id === id) {
+      setSelectedCode(updatedItem);
+    }
   };
 
   return (
@@ -190,13 +241,12 @@ const Dashboard = () => {
       <div style={styles.mainLayout}>
         {/* --- LEFT COLUMN: Editor --- */}
         <div style={styles.leftColumn}>
-          {/* ✅ WARNING BANNER (เฉพาะ Guest) */}
+          {/* WARNING BANNER (เฉพาะ Guest) */}
           {!currentUser && !selectedCode && (
             <div style={styles.warningBanner}>
               <span style={{ marginRight: "10px", fontSize: "18px" }}>ⓘ</span>
               <span>
-                You are currently not logged in, this means you can not edit or
-                delete anything you paste.{" "}
+                You are currently not logged in...{" "}
                 <span onClick={() => navigate("/register")} style={styles.link}>
                   Sign Up
                 </span>
@@ -232,22 +282,14 @@ const Dashboard = () => {
               <textarea
                 style={styles.textarea}
                 placeholder="Paste your code here..."
-                value={
-                  selectedCode && isEditing ? selectedCode.content : newContent
-                }
-                onChange={(e) => {
-                  if (isEditing && selectedCode)
-                    setSelectedCode({
-                      ...selectedCode,
-                      content: e.target.value,
-                    });
-                  else setNewContent(e.target.value);
-                }}
+                // ✅ ใช้ตัวแปร State กลาง (contentInput)
+                value={contentInput}
+                onChange={(e) => setContentInput(e.target.value)}
               />
             )}
           </div>
 
-          {/* ✅ Settings Area & Create Button (เฉพาะ User ที่ Login แล้วเท่านั้น) */}
+          {/* SETTINGS AREA (แสดงเมื่อ Login และ (กำลังสร้าง หรือ กำลังแก้ไข)) */}
           {currentUser && (!selectedCode || isEditing) && (
             <div style={styles.settingsPanel}>
               <h4
@@ -257,39 +299,33 @@ const Dashboard = () => {
                   paddingBottom: "5px",
                 }}
               >
-                Optional Paste Settings
+                {isEditing ? "Edit Settings" : "Optional Paste Settings"}
               </h4>
 
               <div style={styles.formGroup}>
                 <label style={styles.label}>Paste Title:</label>
                 <input
                   style={styles.input}
-                  value={
-                    selectedCode && isEditing ? selectedCode.title : newTitle
-                  }
-                  onChange={(e) => {
-                    if (isEditing && selectedCode)
-                      setSelectedCode({
-                        ...selectedCode,
-                        title: e.target.value,
-                      });
-                    else setNewTitle(e.target.value);
-                  }}
+                  // ✅ ใช้ตัวแปร State กลาง
+                  value={titleInput}
+                  onChange={(e) => setTitleInput(e.target.value)}
                 />
               </div>
 
               <div style={styles.row}>
                 <div style={{ ...styles.formGroup, flex: 1 }}>
                   <label style={styles.label}>Syntax Highlight:</label>
+                  {/* ✅ ลบ disabled ออก เพื่อให้แก้ไขได้ */}
                   <select
                     style={styles.select}
-                    value={newLang}
-                    onChange={(e) => setNewLang(e.target.value)}
-                    disabled={isEditing}
+                    value={langInput}
+                    onChange={(e) => setLangInput(e.target.value)}
                   >
                     <option value="javascript">JavaScript</option>
                     <option value="typescript">TypeScript</option>
                     <option value="python">Python</option>
+                    <option value="html">HTML</option>
+                    <option value="css">CSS</option>
                     <option value="text">None (Text)</option>
                   </select>
                 </div>
@@ -297,9 +333,8 @@ const Dashboard = () => {
                   <label style={styles.label}>Paste Exposure:</label>
                   <select
                     style={styles.select}
-                    value={newVisibility}
-                    onChange={(e) => setNewVisibility(e.target.value as any)}
-                    disabled={isEditing}
+                    value={visibilityInput}
+                    onChange={(e) => setVisibilityInput(e.target.value as any)}
                   >
                     <option value="PUBLIC">Public</option>
                     <option value="PRIVATE">Private</option>
@@ -311,9 +346,8 @@ const Dashboard = () => {
                 <input
                   style={styles.input}
                   placeholder="react, api, tutorial"
-                  value={newTags}
-                  onChange={(e) => setNewTags(e.target.value)}
-                  disabled={isEditing}
+                  value={tagsInput}
+                  onChange={(e) => setTagsInput(e.target.value)}
                 />
               </div>
 
@@ -325,7 +359,11 @@ const Dashboard = () => {
                     </button>
                     <button
                       style={styles.secondaryBtn}
-                      onClick={() => setIsEditing(false)}
+                      onClick={() => {
+                        setIsEditing(false);
+                        // ถ้ากดยกเลิก ให้คืนค่า Content เดิมกลับมา (ถ้าต้องการ)
+                        if (selectedCode) setContentInput(selectedCode.content);
+                      }}
                     >
                       Cancel
                     </button>
@@ -339,9 +377,7 @@ const Dashboard = () => {
             </div>
           )}
 
-          {/* ❌ เอาปุ่ม Create สำหรับ Guest ออกไปแล้ว ตามคำขอ */}
-
-          {/* Actions Bar (Like/Edit/Delete) - View Mode */}
+          {/* ACTIONS BAR - View Mode */}
           {selectedCode && !isEditing && (
             <div style={styles.actionBar}>
               <div style={{ display: "flex", gap: "10px" }}>
@@ -370,9 +406,10 @@ const Dashboard = () => {
               {(currentUser?.id === selectedCode.author.id ||
                 currentUser?.role === "ADMIN") && (
                 <div>
+                  {/* ✅ เรียก startEditMode แทนการ set state เอง */}
                   <button
                     style={{ ...styles.actionBtn, color: "#fb8c00" }}
-                    onClick={() => setIsEditing(true)}
+                    onClick={startEditMode}
                   >
                     Edit
                   </button>
@@ -401,10 +438,8 @@ const Dashboard = () => {
                     selectedCode?.id === code.id ? "#333" : "transparent",
                 }}
                 onClick={() => {
-                  setSelectedCode(code);
-                  setIsEditing(false);
+                  handleSelectCode(code);
                   navigate(`/snippet/${code.id}`);
-                  window.scrollTo({ top: 0, behavior: "smooth" });
                 }}
               >
                 <div style={styles.sidebarIcon}>
@@ -429,7 +464,6 @@ const Dashboard = () => {
 };
 
 const styles: { [key: string]: React.CSSProperties } = {
-  // ... (คงเดิม) ...
   pageContainer: {
     backgroundColor: "#181818",
     minHeight: "100vh",
@@ -554,7 +588,6 @@ const styles: { [key: string]: React.CSSProperties } = {
     boxSizing: "border-box",
   },
   codeView: {
-    // width: "100%",
     minHeight: "400px",
     backgroundColor: "#1e1e1e",
     color: "#d4d4d4",
@@ -670,8 +703,6 @@ const styles: { [key: string]: React.CSSProperties } = {
     fontSize: "11px",
     marginLeft: "10px",
   },
-
-  // Warning Banner Style
   warningBanner: {
     backgroundColor: "#2c2c2c",
     border: "1px solid #444",
