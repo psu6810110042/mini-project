@@ -1,15 +1,16 @@
 import { useEffect, useState } from "react";
-import { 
-  Layout, Table, Button, Popconfirm, message, Tabs, Tag as AntTag, Card, Statistic, Row, Col, theme 
+import {
+  Layout, Table, Button, Popconfirm, message, Tabs, Tag as AntTag, Card, Statistic, Row, Col, theme
 } from "antd";
-import { 
-  DeleteOutlined, 
-  UserOutlined, 
-  CodeOutlined, 
-  TagsOutlined, 
-  ReloadOutlined 
+import {
+  DeleteOutlined,
+  UserOutlined,
+  CodeOutlined,
+  TagsOutlined,
+  ReloadOutlined
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
+import type { User, CodeSnippet, Tag } from '../types';
 
 // Import Services
 import { getAllUsers, deleteUser, getAllTags, deleteTag } from "../services/adminService";
@@ -23,11 +24,9 @@ const AdminPanel = () => {
 
   // --- State ---
   const [loading, setLoading] = useState(false);
-  
-  // Initialize as empty arrays to prevent "map is not a function" errors
-  const [users, setUsers] = useState<any[]>([]);
-  const [snippets, setSnippets] = useState<any[]>([]);
-  const [tags, setTags] = useState<any[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [snippets, setSnippets] = useState<CodeSnippet[]>([]);
+  const [tags, setTags] = useState<Tag[]>([]);
 
   // --- Initial Check ---
   useEffect(() => {
@@ -64,7 +63,7 @@ const AdminPanel = () => {
       setUsers(Array.isArray(usersData) ? usersData : []);
       setSnippets(Array.isArray(snippetsData) ? snippetsData : []);
       setTags(Array.isArray(tagsData) ? tagsData : []);
-      
+
     } catch (error) {
       console.error(error);
       message.error("Failed to load admin data");
@@ -108,19 +107,19 @@ const AdminPanel = () => {
   const userColumns = [
     { title: 'ID', dataIndex: 'id', width: 80 },
     { title: 'Username', dataIndex: 'username', render: (text: string) => <strong>{text}</strong> },
-    { 
-      title: 'Role', 
-      dataIndex: 'role', 
-      render: (role: string) => <AntTag color={role === 'ADMIN' ? 'red' : 'blue'}>{role}</AntTag> 
+    {
+      title: 'Role',
+      dataIndex: 'role',
+      render: (role: string) => <AntTag color={role === 'ADMIN' ? 'red' : 'blue'}>{role}</AntTag>
     },
-    { 
-      title: 'Action', 
-      key: 'action', 
-      render: (_: any, record: any) => (
+    {
+      title: 'Action',
+      key: 'action',
+      render: (_: unknown, record: User) => (
         <Popconfirm title="Delete user?" onConfirm={() => handleDeleteUser(record.id)}>
-          <Button danger icon={<DeleteOutlined />} size="small" disabled={record.role === 'ADMIN'}>Delete</Button>
+          <Button danger icon={<DeleteOutlined />} />
         </Popconfirm>
-      ) 
+      ),
     },
   ];
 
@@ -128,40 +127,40 @@ const AdminPanel = () => {
     { title: 'Title', dataIndex: 'title', ellipsis: true },
     { title: 'Author', dataIndex: ['author', 'username'], render: (t: string) => <AntTag>{t}</AntTag> },
     { title: 'Lang', dataIndex: 'language' },
-    { 
-      title: 'Visibility', 
+    {
+      title: 'Visibility',
       dataIndex: 'visibility',
-      render: (v: string) => <AntTag color={v === 'PRIVATE' ? 'gold' : 'green'}>{v}</AntTag> 
+      render: (v: string) => <AntTag color={v === 'PRIVATE' ? 'gold' : 'green'}>{v}</AntTag>
     },
-    { 
-      title: 'Action', 
-      key: 'action', 
-      render: (_: any, record: any) => (
+    {
+      title: 'Action',
+      key: 'action',
+      render: (_: unknown, record: CodeSnippet) => (
         <Popconfirm title="Delete snippet?" onConfirm={() => handleDeleteSnippet(record.id)}>
-          <Button danger icon={<DeleteOutlined />} size="small">Delete</Button>
+          <Button danger icon={<DeleteOutlined />} />
         </Popconfirm>
-      ) 
+      ),
     },
   ];
 
   const tagColumns = [
     { title: 'ID', dataIndex: 'id', width: 80 },
     { title: 'Name', dataIndex: 'name', render: (t: string) => <AntTag color="geekblue">#{t}</AntTag> },
-    { 
-      title: 'Action', 
-      key: 'action', 
-      render: (_: any, record: any) => (
+    {
+      title: 'Action',
+      key: 'action',
+      render: (_: unknown, record: Tag) => (
         <Popconfirm title="Delete tag?" onConfirm={() => handleDeleteTag(record.id)}>
-          <Button danger icon={<DeleteOutlined />} size="small">Delete</Button>
+          <Button danger icon={<DeleteOutlined />} />
         </Popconfirm>
-      ) 
+      ),
     },
   ];
 
   return (
     <Layout style={{ minHeight: "100vh", background: token.colorBgLayout }}>
       <Content style={{ padding: "50px", maxWidth: "1200px", margin: "0 auto", width: "100%" }}>
-        
+
         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 20 }}>
           <h1 style={{ color: token.colorText }}>🛡️ Admin Panel</h1>
           <Button icon={<ReloadOutlined />} onClick={fetchAllData}>Refresh Data</Button>
@@ -210,7 +209,7 @@ const AdminPanel = () => {
         </Card>
 
         <div style={{ marginTop: 20 }}>
-           <Button onClick={() => navigate('/')}>Back to Dashboard</Button>
+          <Button onClick={() => navigate('/')}>Back to Dashboard</Button>
         </div>
 
       </Content>

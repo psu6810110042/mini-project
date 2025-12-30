@@ -29,6 +29,20 @@ export interface CodeSnippet {
 }
 
 export interface AuthResponse {
-  access_token: string; // NestJS มักใช้ access_token
-  user: User;
+  accessToken: string; 
+  user: {
+    id: number;
+    username: string;
+    role: 'ADMIN' | 'USER';
+  };
+}
+
+export interface LoginFieldValues {
+  username: string;
+  password: string; 
+}
+
+export interface RegisterFieldValues {
+  username: string;
+  password: string;
 }

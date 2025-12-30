@@ -2,11 +2,14 @@ import { Controller, Get, Post, Body, Param, UseGuards, Request, Patch, Delete }
 import { SnippetsService } from './snippets.service';
 import { CreateSnippetDto } from './dto/create-snippet.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { OptionalJwtAuthGuard } from '../auth/jwt.guard'; // You'll create this
+import { OptionalJwtAuthGuard } from '../auth/jwt.guard';
+import type { Request as ExpressRequest } from 'express';
+import { UpdateSnippetDto } from './dto/update-snippet.dto';
+import { User } from '../users/entities/user.entity';
 
 @Controller('snippets')
 export class SnippetsController {
-  constructor(private readonly snippetsService: SnippetsService) {}
+  constructor(private readonly snippetsService: SnippetsService) { }
 
   @UseGuards(JwtAuthGuard)
   @Post()
@@ -14,7 +17,7 @@ export class SnippetsController {
     return this.snippetsService.create(createDto, req.user);
   }
 
-  @UseGuards(OptionalJwtAuthGuard) 
+  @UseGuards(OptionalJwtAuthGuard)
   @Get(':id')
   findOne(@Request() req, @Param('id') id: string) {
     return this.snippetsService.findOne(id, req.user);
@@ -28,8 +31,9 @@ export class SnippetsController {
 
   @UseGuards(JwtAuthGuard) // Must be logged in to edit/delete
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateDto: any, @Request() req) {
-    return this.snippetsService.update(id, updateDto, req.user);
+  update(@Param('id') id: string, @Body() updateDto: UpdateSnippetDto, @Request() req: ExpressRequest) {
+    // Now req.user and updateDto are properly typed
+    return this.snippetsService.update(id, updateDto, req.user as User);
   }
 
   @UseGuards(JwtAuthGuard)

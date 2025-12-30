@@ -10,7 +10,7 @@ import {
   Select,
   Typography,
   Tag,
-  List,
+  // List, // Removed List import
   message,
   Modal,
   Space,
@@ -208,8 +208,9 @@ const Dashboard = () => {
       message.success("Paste created successfully!");
       resetToCreateMode();
       fetchData();
-    } catch (err: any) {
-      message.error(err.message || "Failed to create paste");
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : "Failed to create paste";
+      message.error(errorMessage);
     }
   };
 
@@ -272,9 +273,8 @@ const Dashboard = () => {
 
   const renderEditorOrView = () => {
     // Determine if we are in Dark Mode based on Ant Design's token
-    // (If the background is dark, we use the Dark code theme)
     const isDarkMode = token.colorBgContainer === '#141414' || token.colorBgLayout === '#000000';
-    
+
     if (selectedCode && !isEditing) {
       return (
         <Card
@@ -305,23 +305,22 @@ const Dashboard = () => {
             </Space>
           }
         >
-          {/* REPLACED <pre> WITH SyntaxHighlighter */}
           <SyntaxHighlighter
             language={selectedCode.language === 'text' ? 'text' : selectedCode.language}
-            style={isDarkMode ? vscDarkPlus : vs} // Auto-switch theme
-            showLineNumbers={true}                // <--- Adds Line Numbers
-            wrapLines={true}                      // <--- Wraps long lines
+            style={isDarkMode ? vscDarkPlus : vs}
+            showLineNumbers={true}
+            wrapLines={true}
             customStyle={{
               margin: 0,
               borderRadius: token.borderRadius,
               border: `1px solid ${token.colorBorder}`,
               fontSize: '14px',
-              backgroundColor: isDarkMode ? '#1e1e1e' : '#f5f5f5', // Match AntD card bg
+              backgroundColor: isDarkMode ? '#1e1e1e' : '#f5f5f5',
             }}
             lineNumberStyle={{
               minWidth: '2.5em',
               paddingRight: '1em',
-              color: isDarkMode ? '#6e7681' : '#bfbfbf', // Subtle line numbers
+              color: isDarkMode ? '#6e7681' : '#bfbfbf',
               textAlign: 'right'
             }}
           >
@@ -349,18 +348,17 @@ const Dashboard = () => {
 
     // Create or Edit Mode
     return (
-      <Card title={isEditing ? "Edit Paste" : "New Paste"} bordered={false} style={{ height: '100%' }}>
+      <Card title={isEditing ? "Edit Paste" : "New Paste"} variant={"outlined"} style={{ height: '100%' }}>
         <TextArea
           rows={20}
           placeholder="Paste your code here..."
           value={contentInput}
           onChange={(e) => setContentInput(e.target.value)}
-          style={{ 
-            fontFamily: "'Consolas', 'Monaco', monospace", 
-            fontSize: '14px', 
+          style={{
+            fontFamily: "'Consolas', 'Monaco', monospace",
+            fontSize: '14px',
             resize: 'none',
-            // Optional: Force the editor to use the same background color as the view mode for perfect matching
-            backgroundColor: token.colorFillQuaternary 
+            backgroundColor: token.colorFillQuaternary
           }}
         />
 
@@ -438,13 +436,13 @@ const Dashboard = () => {
 
   return (
     <Layout style={{ minHeight: '100vh', background: token.colorBgLayout }}>
-      {/* 1. Navbar: Switched from hardcoded #001529 to token.colorBgContainer so it respects theme */}
+      {/* 1. Navbar */}
       <Header style={{
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
         padding: '0 24px',
-        background: token.colorBgContainer, // Dynamic background
+        background: token.colorBgContainer,
         borderBottom: `1px solid ${token.colorBorder}`
       }}>
         <div style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }} onClick={resetToCreateMode}>
@@ -471,15 +469,14 @@ const Dashboard = () => {
                 zIndex: 1000,
                 boxShadow: token.boxShadowSecondary,
                 maxHeight: '400px',
-                overflowY: 'auto',
                 borderRadius: '8px',
-                background: token.colorBgElevated // Dynamic Dropdown Background
+                background: token.colorBgElevated,
               }}
-              bodyStyle={{ padding: 0 }} // Reset padding so header sits flush
+              bodyStyle={{ padding: 0 }} // Remove default padding for custom list
             >
               <div style={{
                 padding: '8px 16px',
-                background: token.colorFillAlter, // Subtle offset color
+                background: token.colorFillAlter,
                 borderBottom: `1px solid ${token.colorBorder}`,
                 display: 'flex',
                 justifyContent: 'space-between'
@@ -487,20 +484,23 @@ const Dashboard = () => {
                 <Text type="secondary" style={{ fontSize: 12 }}>Found {searchResults.length} results</Text>
                 <CloseCircleFilled onClick={() => setSearchQuery("")} style={{ cursor: 'pointer', color: token.colorTextDescription }} />
               </div>
+              
               {searchResults.length === 0 ? (
                 <Empty description="No matching pastes found" image={Empty.PRESENTED_IMAGE_SIMPLE} style={{ padding: 20 }} />
               ) : (
-                <List
-                  dataSource={searchResults}
-                  renderItem={item => (
-                    <List.Item
+                /* REPLACED List WITH Map */
+                <div style={{ maxHeight: '350px', overflowY: 'auto' }}>
+                  {searchResults.map((item) => (
+                    <div
+                      key={item.id}
                       style={{
                         padding: '10px 16px',
                         cursor: 'pointer',
-                        transition: 'background 0.2s',
+                        borderBottom: `1px solid ${token.colorSplit}`,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between'
                       }}
-                      className="search-result-item"
-                      // Add hover effect via CSS or simple style prop logic (CSS class recommended for hover in React)
                       onMouseEnter={(e) => e.currentTarget.style.background = token.colorFillTertiary}
                       onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                       onClick={() => {
@@ -508,15 +508,19 @@ const Dashboard = () => {
                         navigate(`/snippet/${item.id}`);
                       }}
                     >
-                      <List.Item.Meta
-                        avatar={<Avatar size="small" style={{ backgroundColor: token.colorPrimary }} icon={<CodeOutlined />} />}
-                        title={<Text strong>{item.title || "Untitled"}</Text>}
-                        description={`${item.language} • ${new Date(item.createdAt).toLocaleDateString()}`}
-                      />
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <Avatar size="small" style={{ backgroundColor: token.colorPrimary }} icon={<CodeOutlined />} />
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                          <Text strong>{item.title || "Untitled"}</Text>
+                          <Text type="secondary" style={{ fontSize: 12 }}>
+                            {item.language} • {new Date(item.createdAt).toLocaleDateString()}
+                          </Text>
+                        </div>
+                      </div>
                       {item.visibility === 'PRIVATE' && <Tag color="gold">Private</Tag>}
-                    </List.Item>
-                  )}
-                />
+                    </div>
+                  ))}
+                </div>
               )}
             </Card>
           )}
@@ -524,20 +528,18 @@ const Dashboard = () => {
 
         <Space>
           <Button type="primary" icon={<PlusOutlined />} onClick={resetToCreateMode}>New Paste</Button>
-          
           {currentUser ? (
             <>
               {currentUser.role === 'ADMIN' && (
-                <Button 
-                  type="primary" 
-                  danger // Makes the button red to stand out
-                  icon={<SafetyCertificateOutlined />} 
+                <Button
+                  type="primary"
+                  danger
+                  icon={<SafetyCertificateOutlined />}
                   onClick={() => navigate('/admin')}
                 >
                   Admin Panel
                 </Button>
               )}
-
               <Text><UserOutlined /> {currentUser.username}</Text>
               <Button type="text" icon={<LogoutOutlined />} onClick={handleLogout}>Logout</Button>
             </>
@@ -558,7 +560,6 @@ const Dashboard = () => {
           <Col xs={24} md={18} lg={19}>
             {!currentUser && !selectedCode && (
               <Alert
-                message="You are currently not logged in"
                 description="Sign up or Login to save your pastes privately and edit them later."
                 type="info"
                 showIcon
@@ -572,73 +573,67 @@ const Dashboard = () => {
                 }
               />
             )}
-
             {renderEditorOrView()}
           </Col>
 
           {/* RIGHT COLUMN: Sidebar (Always Latest 5) */}
           <Col xs={24} md={6} lg={5}>
             <Card
-              title={<span><FireOutlined style={{ color: 'orange' }} /> Trending (Week)</span>} // Updated Title
-              bodyStyle={{ padding: 0 }}
+              title={<span><FireOutlined style={{ color: 'orange' }} /> Trending (Week)</span>}
+              bodyStyle={{ padding: 0 }} // Remove default padding to let map items touch edges
             >
-              <List
-                loading={loading}
-                itemLayout="horizontal"
-                dataSource={trendingCodes} // <--- Use the new sorted list
-                style={{ maxHeight: '80vh', overflowY: 'auto' }}
-                renderItem={item => (
-                  <List.Item
-                    style={{
-                      padding: '12px 16px',
-                      cursor: 'pointer',
-                      background: selectedCode?.id === item.id ? token.colorPrimaryBg : 'transparent',
-                      transition: 'background 0.3s'
-                    }}
-                    onClick={() => {
-                      handleSelectCode(item);
-                      navigate(`/snippet/${item.id}`);
-                    }}
-                  >
-                    <List.Item.Meta
-                      avatar={
-                        // Show Rank Number (1, 2, 3...)
-                        <Avatar
-                          size="small"
-                          style={{ 
-                             backgroundColor: trendingCodes.indexOf(item) === 0 ? '#ffbf00' : token.colorFillContent, 
-                             color: trendingCodes.indexOf(item) === 0 ? 'white' : token.colorText 
-                          }}
-                        >
-                          {trendingCodes.indexOf(item) + 1}
-                        </Avatar>
-                      }
-                      title={
-                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                          <Text strong style={{ fontSize: 13, maxWidth: '100px' }} ellipsis>{item.title || "Untitled"}</Text>
-                          {/* 2. ADD LIKE COUNT HERE */}
-                          <Space size={4} style={{ fontSize: 12, color: token.colorTextSecondary }}>
+              {/* REPLACED List WITH Map */}
+              <div style={{ maxHeight: '80vh', overflowY: 'auto' }}>
+                {trendingCodes.length > 0 ? (
+                  trendingCodes.map((item, index) => (
+                    <div
+                      key={item.id}
+                      style={{
+                        padding: '12px 16px',
+                        cursor: 'pointer',
+                        background: selectedCode?.id === item.id ? token.colorPrimaryBg : 'transparent',
+                        borderBottom: `1px solid ${token.colorSplit}`,
+                        display: 'flex',
+                        gap: 12,
+                        alignItems: 'center',
+                        transition: 'background 0.3s'
+                      }}
+                      onClick={() => {
+                        handleSelectCode(item);
+                        navigate(`/snippet/${item.id}`);
+                      }}
+                    >
+                      {/* Avatar / Rank */}
+                      <Avatar
+                        size="small"
+                        style={{
+                          backgroundColor: index === 0 ? '#ffbf00' : token.colorFillContent,
+                          color: index === 0 ? 'white' : token.colorText,
+                          flexShrink: 0
+                        }}
+                      >
+                        {index + 1}
+                      </Avatar>
+
+                      {/* Content Area */}
+                      <div style={{ flex: 1, overflow: 'hidden' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                          <Text strong style={{ fontSize: 13 }} ellipsis>{item.title || "Untitled"}</Text>
+                          <Space size={4} style={{ fontSize: 12, color: token.colorTextSecondary, flexShrink: 0 }}>
                             <HeartFilled style={{ color: 'red', fontSize: 10 }} />
                             {item.likes.length}
                           </Space>
                         </div>
-                      }
-                      description={
-                        <Space direction="vertical" size={0}>
-                          <Tag style={{ margin: 0, fontSize: 10 }}>{item.language}</Tag>
-                        </Space>
-                      }
-                    />
-                  </List.Item>
+                        <Tag style={{ margin: 0, fontSize: 10 }}>{item.language}</Tag>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div style={{ padding: 20, textAlign: 'center', color: token.colorTextDescription }}>
+                    No trending posts this week
+                  </div>
                 )}
-              />
-              
-              {/* Fallback if no trending posts */}
-              {trendingCodes.length === 0 && (
-                <div style={{ padding: 20, textAlign: 'center', color: token.colorTextDescription }}>
-                  No trending posts this week
-                </div>
-              )}
+              </div>
             </Card>
           </Col>
         </Row>

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Form, Input, Button, Card, Typography, Alert, message } from 'antd';
 import { UserOutlined, LockOutlined } from '@ant-design/icons';
 import { registerService } from '../services/authService';
+import type { RegisterFieldValues } from '../types';
 
 const { Title, Text } = Typography;
 
@@ -12,19 +13,20 @@ const RegisterPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   // Ant Design handles form state automatically
-  const onFinish = async (values: any) => {
+  const onFinish = async (values: RegisterFieldValues) => {
     setLoading(true);
     setError(null);
 
     try {
       // ✅ Call the register service
       await registerService(values.username, values.password);
-      
+
       message.success('Registration successful! Please login.');
       navigate('/login');
-      
-    } catch (err: any) {
-      const errorMessage = err.message || 'Registration failed. Please try again.';
+
+    } catch (err: unknown) {
+      // Use a type guard to safely access the message
+      const errorMessage = err instanceof Error ? err.message : 'Registration failed. Please try again.';
       setError(errorMessage);
       message.error(errorMessage);
     } finally {
@@ -80,9 +82,9 @@ const RegisterPage: React.FC = () => {
               { min: 3, message: 'Username must be at least 3 characters' }
             ]}
           >
-            <Input 
-              prefix={<UserOutlined className="site-form-item-icon" />} 
-              placeholder="Username" 
+            <Input
+              prefix={<UserOutlined className="site-form-item-icon" />}
+              placeholder="Username"
             />
           </Form.Item>
 

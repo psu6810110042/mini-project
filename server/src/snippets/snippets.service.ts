@@ -4,7 +4,8 @@ import { Repository } from 'typeorm';
 import { Snippet } from './entities/snippet.entity';
 import { CreateSnippetDto } from './dto/create-snippet.dto';
 import { User } from '../users/entities/user.entity';
-import { Tag } from '../tags/entities/tag.entity';
+import { Tag } from '../tags/entities/tag.entity'
+import { UpdateSnippetDto } from './dto/update-snippet.dto';;
 import { customAlphabet } from 'nanoid';
 
 @Injectable()
@@ -15,15 +16,6 @@ export class SnippetsService {
   ) { }
 
   async create(createDto: CreateSnippetDto, user: User) {
-    const snippet = new Snippet();
-    const generateId = customAlphabet('123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz', 6);
-    snippet.id = generateId();
-    snippet.title = createDto.title;
-    snippet.content = createDto.content;
-    snippet.language = createDto.language;
-    snippet.visibility = createDto.visibility;
-    snippet.author = user;
-
     const tagEntities: Tag[] = [];
 
     for (const rawTagName of createDto.tags) {
@@ -35,7 +27,19 @@ export class SnippetsService {
       }
       tagEntities.push(tag);
     }
-    snippet.tags = tagEntities;
+
+    const generateId = customAlphabet('123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz', 6);
+
+    const snippet = this.snippetRepo.create({
+      id: generateId(),
+      title: createDto.title,
+      content: createDto.content,
+      language: createDto.language,
+      visibility: createDto.visibility,
+      author: user,
+      authorId: user.id, 
+      tags: tagEntities,
+    });
 
     return this.snippetRepo.save(snippet);
   }
@@ -89,32 +93,33 @@ export class SnippetsService {
     });
   }
 
-async update(id: string, updateDto: any, user: User) {
+  async update(id: string, updateDto: UpdateSnippetDto, user: User) {
     const snippet = await this.findOne(id, user);
 
-    if (user.role !== 'ADMIN' && snippet.author.id !== user.id) {
-      throw new ForbiddenException('You can only edit your own snippets');
+    if (user.role !== 'ADMIN' && snippet.authorId !== user.id) {
+      throw new ForbiddenException('You are not authorized to edit this snippet');
     }
+
 
     if (updateDto.tags) {
       const tagEntities: Tag[] = [];
-      
+
       // Loop through the strings sent from frontend
       for (const rawTagName of updateDto.tags) {
         const tagName = rawTagName.toLowerCase();
-        
+
         // Check if tag exists
         let tag = await this.tagRepo.findOneBy({ name: tagName });
-        
+
         // If not, create it
         if (!tag) {
           tag = this.tagRepo.create({ name: tagName });
           await this.tagRepo.save(tag);
         }
-        
+
         tagEntities.push(tag);
       }
-      
+
       snippet.tags = tagEntities;
     }
 

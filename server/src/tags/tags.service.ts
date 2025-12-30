@@ -14,7 +14,18 @@ export class TagsService {
 
   // 1. Create Tag
   async create(createTagDto: CreateTagDto) {
-    const tag = this.tagRepository.create(createTagDto);
+    const name = createTagDto.name.toLowerCase();
+    
+    // 1. Check if it exists
+    const existingTag = await this.tagRepository.findOneBy({ name });
+    
+    // 2. ✅ FIX: Return it immediately if found
+    if (existingTag) {
+      return existingTag; 
+    }
+
+    // 3. Otherwise create new
+    const tag = this.tagRepository.create({ name });
     return this.tagRepository.save(tag);
   }
 

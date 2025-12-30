@@ -7,28 +7,35 @@ import {
 import { UsersService } from '../users/users.service';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
+import { User } from '../users/entities/user.entity';
+
+type UserWithoutPassword = Omit<User, 'password'>;
 
 @Injectable()
 export class AuthService {
   constructor(
     private usersService: UsersService,
     private jwtService: JwtService,
-  ) {}
+  ) { }
 
-  async validateUser(username: string, pass: string): Promise<any> {
+  async validateUser(username: string, pass: string): Promise<UserWithoutPassword | null> {
     const user = await this.usersService.findByUsername(username);
-    if (user && (await bcrypt.compare(pass, user.password))) {
+    if (user && await bcrypt.compare(pass, user.password)) {
       const { password, ...result } = user;
       return result;
     }
     return null;
   }
 
-  async login(user: any) {
+  async login(user: UserWithoutPassword) {
     const payload = { username: user.username, sub: user.id, role: user.role };
     return {
       accessToken: this.jwtService.sign(payload),
-      user: { id: user.id, username: user.username, role: user.role },
+      user: {
+        id: user.id,
+        username: user.username,
+        role: user.role,
+      },
     };
   }
 

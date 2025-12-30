@@ -2,14 +2,16 @@ import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@n
 import { TagsService } from './tags.service';
 import { CreateTagDto } from './dto/create-tag.dto';
 import { UpdateTagDto } from './dto/update-tag.dto';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard'; // Use Guard if you want to protect edits
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { Roles } from '../auth/roles.decorator';
+import { RolesGuard } from '../auth/roles.guard';
 
 @Controller('tags')
 export class TagsController {
-  constructor(private readonly tagsService: TagsService) {}
+  constructor(private readonly tagsService: TagsService) { }
 
   @Post()
-  @UseGuards(JwtAuthGuard) // Only logged in users can create tags directly
+  @UseGuards(JwtAuthGuard)
   create(@Body() createTagDto: CreateTagDto) {
     return this.tagsService.create(createTagDto);
   }
@@ -30,8 +32,9 @@ export class TagsController {
     return this.tagsService.update(+id, updateTagDto);
   }
 
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Delete(':id')
-  @UseGuards(JwtAuthGuard)
+  @Roles('ADMIN')
   remove(@Param('id') id: string) {
     return this.tagsService.remove(+id);
   }
