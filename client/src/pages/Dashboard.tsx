@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import {
   getCodes,
   createCodeService,
@@ -11,6 +11,7 @@ import type { CodeSnippet, User } from "../types";
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const { id } = useParams();
 
   const [codes, setCodes] = useState<CodeSnippet[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -37,11 +38,23 @@ const Dashboard = () => {
       }
     }
     fetchData();
-  }, []);
+  }, [id]);
 
   const fetchData = async () => {
     const data = await getCodes();
-    if (Array.isArray(data)) setCodes(data);
+    if (Array.isArray(data)) {
+      setCodes(data);
+
+      // ✅ 4. เพิ่ม Logic: ถ้ามี id ใน URL ให้เลือก Snippet นั้นขึ้นมาโชว์เลย
+      if (id) {
+        const foundSnippet = data.find((code) => code.id === id);
+        if (foundSnippet) {
+          setSelectedCode(foundSnippet); // แสดงผลทันที
+          // เลื่อนหน้าจอขึ้นบนสุด (เผื่อดูในมือถือ)
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        }
+      }
+    }
   };
 
   const handleLogout = () => {
@@ -390,6 +403,7 @@ const Dashboard = () => {
                 onClick={() => {
                   setSelectedCode(code);
                   setIsEditing(false);
+                  navigate(`/snippet/${code.id}`);
                   window.scrollTo({ top: 0, behavior: "smooth" });
                 }}
               >
