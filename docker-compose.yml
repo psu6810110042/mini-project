@@ -16,7 +16,7 @@ services:
 
   server:
     build:
-      context: ./server
+      context: ./backend
       dockerfile: Dockerfile
     container_name: backend
     restart: unless-stopped
@@ -24,10 +24,10 @@ services:
       - '3000:3000'
     volumes:
       # Mount source code for hot reload
-      - ./server/src:/app/src
-      - ./server/tsconfig.json:/app/tsconfig.json
-      - ./server/tsconfig.build.json:/app/tsconfig.build.json
-      - ./server/nest-cli.json:/app/nest-cli.json
+      - ./backend/src:/app/src
+      - ./backend/tsconfig.json:/app/tsconfig.json
+      - ./backend/tsconfig.build.json:/app/tsconfig.build.json
+      - ./backend/nest-cli.json:/app/nest-cli.json
     environment:
       DB_HOST: db 
       DB_PORT: 5432
@@ -42,19 +42,19 @@ services:
       
   client:
     build:
-      context: ./client
+      context: ./frontend
       dockerfile: Dockerfile
     container_name: frontend
     restart: unless-stopped
     ports:
       - '5173:5173'
     volumes:
-      - ./client/src:/app/src
-      - ./client/public:/app/public          # Added
-      - ./client/index.html:/app/index.html  # Added
-      - ./client/tsconfig.json:/app/tsconfig.json
-      - ./client/tsconfig.app.json:/app/tsconfig.app.json
-      - ./client/vite.config.ts:/app/vite.config.ts
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public          # Added
+      - ./frontend/index.html:/app/index.html  # Added
+      - ./frontend/tsconfig.json:/app/tsconfig.json
+      - ./frontend/tsconfig.app.json:/app/tsconfig.app.json
+      - ./frontend/vite.config.ts:/app/vite.config.ts
     environment:
       - VITE_API_URL=http://localhost:3000
     depends_on:

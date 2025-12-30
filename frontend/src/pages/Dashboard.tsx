@@ -35,6 +35,7 @@ import {
   FireOutlined,
   CloseCircleFilled,
   SafetyCertificateOutlined,
+  FileTextOutlined,
 } from "@ant-design/icons";
 
 import {
@@ -124,6 +125,16 @@ const Dashboard = () => {
     } finally {
     }
   };
+
+  const userCodes = React.useMemo(() => {
+    if (!currentUser) return [];
+    return codes
+      .filter((code) => code.author.id === currentUser.id)
+      .sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      );
+  }, [codes, currentUser]);
 
   const trendingCodes = React.useMemo(() => {
     const oneWeekAgo = new Date();
@@ -689,94 +700,199 @@ const Dashboard = () => {
           </Col>
 
           <Col xs={24} md={6} lg={5}>
-            <Card
-              title={
-                <span>
-                  <FireOutlined style={{ color: "orange" }} /> Trending (Week)
-                </span>
-              }
-              bodyStyle={{ padding: 0 }}
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "16px",
+                height: "100%",
+              }}
             >
-              <div style={{ maxHeight: "80vh", overflowY: "auto" }}>
-                {trendingCodes.length > 0 ? (
-                  trendingCodes.map((item, index) => (
-                    <div
-                      key={item.id}
-                      style={{
-                        padding: "12px 16px",
-                        cursor: "pointer",
-                        background:
-                          selectedCode?.id === item.id
-                            ? token.colorPrimaryBg
-                            : "transparent",
-                        borderBottom: `1px solid ${token.colorSplit}`,
-                        display: "flex",
-                        gap: 12,
-                        alignItems: "center",
-                        transition: "background 0.3s",
-                      }}
-                      onClick={() => {
-                        handleSelectCode(item);
-                        navigate(`/snippet/${item.id}`);
-                      }}
-                    >
-                      <Avatar
-                        size="small"
+              <Card
+                title={
+                  <span>
+                    <FireOutlined style={{ color: "orange" }} /> Trending (Week)
+                  </span>
+                }
+                bodyStyle={{ padding: 0 }}
+                style={{
+                  maxHeight: "50vh",
+                  display: "flex",
+                  flexDirection: "column",
+                }}
+              >
+                <div style={{ flex: 1, overflowY: "auto" }}>
+                  {trendingCodes.length > 0 ? (
+                    trendingCodes.map((item, index) => (
+                      <div
+                        key={item.id}
                         style={{
-                          backgroundColor:
-                            index === 0 ? "#ffbf00" : token.colorFillContent,
-                          color: index === 0 ? "white" : token.colorText,
-                          flexShrink: 0,
+                          padding: "12px 16px",
+                          cursor: "pointer",
+                          background:
+                            selectedCode?.id === item.id
+                              ? token.colorPrimaryBg
+                              : "transparent",
+                          borderBottom: `1px solid ${token.colorSplit}`,
+                          display: "flex",
+                          gap: 12,
+                          alignItems: "center",
+                          transition: "background 0.3s",
+                        }}
+                        onClick={() => {
+                          handleSelectCode(item);
+                          navigate(`/snippet/${item.id}`);
                         }}
                       >
-                        {index + 1}
-                      </Avatar>
-
-                      <div style={{ flex: 1, overflow: "hidden" }}>
-                        <div
+                        <Avatar
+                          size="small"
                           style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                            marginBottom: 4,
+                            backgroundColor:
+                              index === 0 ? "#ffbf00" : token.colorFillContent,
+                            color: index === 0 ? "white" : token.colorText,
+                            flexShrink: 0,
                           }}
                         >
-                          <Text strong style={{ fontSize: 13 }} ellipsis>
-                            {item.title || "Untitled"}
-                          </Text>
-                          <Space
-                            size={4}
+                          {index + 1}
+                        </Avatar>
+
+                        <div style={{ flex: 1, overflow: "hidden" }}>
+                          <div
                             style={{
-                              fontSize: 12,
-                              color: token.colorTextSecondary,
-                              flexShrink: 0,
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                              marginBottom: 4,
                             }}
                           >
-                            <HeartFilled
-                              style={{ color: "red", fontSize: 10 }}
-                            />
-                            {item.likes.length}
-                          </Space>
+                            <Text strong style={{ fontSize: 13 }} ellipsis>
+                              {item.title || "Untitled"}
+                            </Text>
+                            <Space
+                              size={4}
+                              style={{
+                                fontSize: 12,
+                                color: token.colorTextSecondary,
+                                flexShrink: 0,
+                              }}
+                            >
+                              <HeartFilled
+                                style={{ color: "red", fontSize: 10 }}
+                              />
+                              {item.likes.length}
+                            </Space>
+                          </div>
+                          <Tag style={{ margin: 0, fontSize: 10 }}>
+                            {item.language}
+                          </Tag>
                         </div>
-                        <Tag style={{ margin: 0, fontSize: 10 }}>
-                          {item.language}
-                        </Tag>
                       </div>
+                    ))
+                  ) : (
+                    <div
+                      style={{
+                        padding: 20,
+                        textAlign: "center",
+                        color: token.colorTextDescription,
+                      }}
+                    >
+                      No trending posts this week
                     </div>
-                  ))
-                ) : (
-                  <div
-                    style={{
-                      padding: 20,
-                      textAlign: "center",
-                      color: token.colorTextDescription,
-                    }}
-                  >
-                    No trending posts this week
+                  )}
+                </div>
+              </Card>
+
+              {/* --- NEW: My Posts Card --- */}
+              {currentUser && (
+                <Card
+                  title={
+                    <span>
+                      <FileTextOutlined style={{ color: token.colorPrimary }} />{" "}
+                      My Posts
+                    </span>
+                  }
+                  bodyStyle={{ padding: 0 }}
+                  style={{
+                    maxHeight: "50vh",
+                    display: "flex",
+                    flexDirection: "column",
+                  }}
+                >
+                  <div style={{ flex: 1, overflowY: "auto" }}>
+                    {userCodes.length > 0 ? (
+                      userCodes.map((item) => (
+                        <div
+                          key={item.id}
+                          style={{
+                            padding: "12px 16px",
+                            cursor: "pointer",
+                            background:
+                              selectedCode?.id === item.id
+                                ? token.colorPrimaryBg
+                                : "transparent",
+                            borderBottom: `1px solid ${token.colorSplit}`,
+                            display: "flex",
+                            gap: 12,
+                            alignItems: "center",
+                            transition: "background 0.3s",
+                          }}
+                          onClick={() => {
+                            handleSelectCode(item);
+                            navigate(`/snippet/${item.id}`);
+                          }}
+                        >
+                          <Avatar
+                            size="small"
+                            style={{
+                              backgroundColor: token.colorFillContent,
+                              color: token.colorText,
+                              flexShrink: 0,
+                            }}
+                            icon={<CodeOutlined />}
+                          />
+
+                          <div style={{ flex: 1, overflow: "hidden" }}>
+                            <div
+                              style={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                                alignItems: "center",
+                                marginBottom: 4,
+                              }}
+                            >
+                              <Text strong style={{ fontSize: 13 }} ellipsis>
+                                {item.title || "Untitled"}
+                              </Text>
+                              {item.visibility === "PRIVATE" && (
+                                <LockOutlined
+                                  style={{
+                                    fontSize: 10,
+                                    color: token.colorWarning,
+                                  }}
+                                />
+                              )}
+                            </div>
+                            <Tag style={{ margin: 0, fontSize: 10 }}>
+                              {item.language}
+                            </Tag>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div
+                        style={{
+                          padding: 20,
+                          textAlign: "center",
+                          color: token.colorTextDescription,
+                        }}
+                      >
+                        You haven't posted anything yet.
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            </Card>
+                </Card>
+              )}
+            </div>
           </Col>
         </Row>
       </Content>

@@ -54,10 +54,10 @@ On the first run, the system automatically seeds a default administrator account
 ## Project Structure
 ```
 nest-bin-project/
-├── client/            # React Frontend Application
-├── server/            # NestJS Backend API
-├── docker-compose.yml # Orchestration for App + DB
-└── README.md          # This file
+├── frontend/            # React Frontend Application
+├── backend/             # NestJS Backend API
+├── docker-compose.yml   # Orchestration for App + DB
+└── README.md            # This file
 ```
 
 ## Backend Architecture & Security
