@@ -12,6 +12,14 @@ const getAuthHeaders = () => {
   };
 };
 
+export interface UpdateSnippetDto {
+  title?: string;
+  content?: string;
+  language?: string;
+  visibility?: 'PUBLIC' | 'PRIVATE';
+  tags?: string[]; // 👈 กำหนดชัดเจนว่าเป็น Array ของ String
+}
+
 // 1. ดึงข้อมูลทั้งหมด
 export const getCodes = async (): Promise<CodeSnippet[]> => {
   try {
@@ -42,7 +50,7 @@ export const likeCodeService = async (id: string): Promise<void> => {
 };
 
 // 4. แก้ไข Code
-export const updateCodeService = async (id: string, data: Partial<CodeSnippet>) => {
+export const updateCodeService = async (id: string, data: UpdateSnippetDto) => {
   await axios.patch(`${API_URL}/api/snippets/${id}`, data, getAuthHeaders());
 };
 
