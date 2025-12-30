@@ -1,19 +1,23 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Snippet } from './entities/snippet.entity';
-import { CreateSnippetDto } from './dto/create-snippet.dto';
-import { User } from '../users/entities/user.entity';
-import { Tag } from '../tags/entities/tag.entity'
-import { UpdateSnippetDto } from './dto/update-snippet.dto';;
-import { customAlphabet } from 'nanoid';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+} from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { Snippet } from "./entities/snippet.entity";
+import { CreateSnippetDto } from "./dto/create-snippet.dto";
+import { User } from "../users/entities/user.entity";
+import { Tag } from "../tags/entities/tag.entity";
+import { UpdateSnippetDto } from "./dto/update-snippet.dto";
+import { customAlphabet } from "nanoid";
 
 @Injectable()
 export class SnippetsService {
   constructor(
     @InjectRepository(Snippet) private snippetRepo: Repository<Snippet>,
     @InjectRepository(Tag) private tagRepo: Repository<Tag>,
-  ) { }
+  ) {}
 
   async create(createDto: CreateSnippetDto, user: User) {
     const tagEntities: Tag[] = [];
@@ -28,7 +32,10 @@ export class SnippetsService {
       tagEntities.push(tag);
     }
 
-    const generateId = customAlphabet('123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz', 6);
+    const generateId = customAlphabet(
+      "123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz",
+      6,
+    );
 
     const snippet = this.snippetRepo.create({
       id: generateId(),
@@ -37,7 +44,7 @@ export class SnippetsService {
       language: createDto.language,
       visibility: createDto.visibility,
       author: user,
-      authorId: user.id, 
+      authorId: user.id,
       tags: tagEntities,
     });
 
@@ -47,20 +54,19 @@ export class SnippetsService {
   async findOne(id: string, user?: User) {
     const snippet = await this.snippetRepo.findOne({
       where: { id },
-      relations: ['tags', 'author'],
+      relations: ["tags", "author"],
     });
 
-    if (!snippet) throw new NotFoundException('Snippet not found');
+    if (!snippet) throw new NotFoundException("Snippet not found");
 
-    // Requirement Logic
-    if (snippet.visibility === 'PRIVATE') {
-      if (!user) throw new ForbiddenException('Private snippet');
+    if (snippet.visibility === "PRIVATE") {
+      if (!user) throw new ForbiddenException("Private snippet");
 
       const isAuthor = user.id === snippet.authorId;
-      const isAdmin = user.role === 'ADMIN';
+      const isAdmin = user.role === "ADMIN";
 
       if (!isAuthor && !isAdmin) {
-        throw new ForbiddenException('You do not have permission to view this');
+        throw new ForbiddenException("You do not have permission to view this");
       }
     }
 
@@ -68,50 +74,45 @@ export class SnippetsService {
   }
 
   async findAll(user?: User): Promise<Snippet[]> {
-    if (user && user.role === 'ADMIN') {
+    if (user && user.role === "ADMIN") {
       return this.snippetRepo.find({
-        relations: ['tags', 'author', 'likes'],
-        order: { createdAt: 'DESC' },
+        relations: ["tags", "author", "likes"],
+        order: { createdAt: "DESC" },
       });
     }
 
     if (user) {
       return this.snippetRepo.find({
-        where: [
-          { visibility: 'PUBLIC' },
-          { author: { id: user.id } }
-        ],
-        relations: ['tags', 'author', 'likes'],
-        order: { createdAt: 'DESC' },
+        where: [{ visibility: "PUBLIC" }, { author: { id: user.id } }],
+        relations: ["tags", "author", "likes"],
+        order: { createdAt: "DESC" },
       });
     }
 
     return this.snippetRepo.find({
-      where: { visibility: 'PUBLIC' },
-      relations: ['tags', 'author', 'likes'],
-      order: { createdAt: 'DESC' },
+      where: { visibility: "PUBLIC" },
+      relations: ["tags", "author", "likes"],
+      order: { createdAt: "DESC" },
     });
   }
 
   async update(id: string, updateDto: UpdateSnippetDto, user: User) {
     const snippet = await this.findOne(id, user);
 
-    if (user.role !== 'ADMIN' && snippet.authorId !== user.id) {
-      throw new ForbiddenException('You are not authorized to edit this snippet');
+    if (user.role !== "ADMIN" && snippet.authorId !== user.id) {
+      throw new ForbiddenException(
+        "You are not authorized to edit this snippet",
+      );
     }
-
 
     if (updateDto.tags) {
       const tagEntities: Tag[] = [];
 
-      // Loop through the strings sent from frontend
       for (const rawTagName of updateDto.tags) {
         const tagName = rawTagName.toLowerCase();
 
-        // Check if tag exists
         let tag = await this.tagRepo.findOneBy({ name: tagName });
 
-        // If not, create it
         if (!tag) {
           tag = this.tagRepo.create({ name: tagName });
           await this.tagRepo.save(tag);
@@ -132,13 +133,12 @@ export class SnippetsService {
   }
 
   async remove(id: string, user: User) {
-    const snippet = await this.findOne(id, user); // Ensures it exists and user has view access
+    const snippet = await this.findOne(id, user);
 
-    // PERMISSION CHECK:
-    // 1. Admin can delete anything.
-    // 2. User can ONLY delete their own.
-    if (user.role !== 'ADMIN' && snippet.author.id !== user.id) {
-      throw new ForbiddenException('You are not allowed to delete this snippet');
+    if (user.role !== "ADMIN" && snippet.author.id !== user.id) {
+      throw new ForbiddenException(
+        "You are not allowed to delete this snippet",
+      );
     }
 
     return this.snippetRepo.remove(snippet);
@@ -147,19 +147,16 @@ export class SnippetsService {
   async toggleLike(id: string, user: User) {
     const snippet = await this.snippetRepo.findOne({
       where: { id },
-      relations: ['likes'], // We must load the list to check it
+      relations: ["likes"],
     });
 
-    if (!snippet) throw new NotFoundException('Snippet not found');
+    if (!snippet) throw new NotFoundException("Snippet not found");
 
-    // Check if user already liked it
     const index = snippet.likes.findIndex((u) => u.id === user.id);
 
     if (index === -1) {
-      // Not found -> Add Like
       snippet.likes.push(user);
     } else {
-      // Found -> Remove Like
       snippet.likes.splice(index, 1);
     }
 

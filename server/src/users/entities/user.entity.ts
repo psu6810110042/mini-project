@@ -1,10 +1,10 @@
-import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
-import { Snippet } from '../../snippets/entities/snippet.entity';
-import { Exclude } from 'class-transformer';
+import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from "typeorm";
+import { Snippet } from "../../snippets/entities/snippet.entity";
+import { Exclude } from "class-transformer";
 
 export enum UserRole {
-  ADMIN = 'ADMIN',
-  USER = 'USER',
+  ADMIN = "ADMIN",
+  USER = "USER",
 }
 
 @Entity()
@@ -19,7 +19,7 @@ export class User {
   @Exclude()
   password: string;
 
-  @Column({ type: 'enum', enum: UserRole, default: UserRole.USER })
+  @Column({ type: "enum", enum: UserRole, default: UserRole.USER })
   @Exclude()
   role: UserRole;
 

@@ -23,7 +23,7 @@ describe('AppController (e2e) - Complete Security Matrix', () => {
   // 1. Define Users
   // Note: We assume your CreateUserDto allows passing 'role'. 
   // If not, you'd need to manually set the Admin role in the DB.
-  const adminUser = { username: `khetadmin`, password: 'adminkhet123'};
+  const adminUser = { username: `khetadmin`, password: 'adminkhet123' };
   const ownerUser = { username: `owner_${timestamp}`, password: 'password123' };
   const hackerUser = { username: `hacker_${timestamp}`, password: 'password123' };
 
@@ -91,7 +91,7 @@ describe('AppController (e2e) - Complete Security Matrix', () => {
 
     // 🔴 PATCH /tags/:id (You were worried about missing this)
     it('PATCH /tags/:id - Guest blocked (401)', () => {
-       return request(app.getHttpServer()).patch(`/api/tags/${tagId}`).send({ name: 'fail' }).expect(401);
+      return request(app.getHttpServer()).patch(`/api/tags/${tagId}`).send({ name: 'fail' }).expect(401);
     });
 
     it('PATCH /tags/:id - Owner Updates (200)', () => {
@@ -137,20 +137,20 @@ describe('AppController (e2e) - Complete Security Matrix', () => {
       const res = await request(app.getHttpServer())
         .post('/api/snippets')
         .set('Authorization', `Bearer ${ownerToken}`)
-        .send({ 
-          title: 'Private Data', 
-          content: 'secret', 
-          language: 'txt', 
-          visibility: 'PRIVATE', 
-          tags: [] 
+        .send({
+          title: 'Private Data',
+          content: 'secret',
+          language: 'txt',
+          visibility: 'PRIVATE',
+          tags: []
         })
         .expect(201);
       snippetId = res.body.id;
     });
-    
+
     // 🔴 PUBLIC LIST (Snippet List)
     it('GET /snippets - Public Access (200)', () => {
-        return request(app.getHttpServer()).get('/api/snippets').expect(200);
+      return request(app.getHttpServer()).get('/api/snippets').expect(200);
     });
 
     // 🔒 READ SECURITY
@@ -179,12 +179,12 @@ describe('AppController (e2e) - Complete Security Matrix', () => {
 
     // 🔴 LIKE ENDPOINT (Specific Logic)
     it('POST /snippets/:id/like - Guest blocked (401)', () => {
-         return request(app.getHttpServer()).post(`/api/snippets/${snippetId}/like`).expect(401);
+      return request(app.getHttpServer()).post(`/api/snippets/${snippetId}/like`).expect(401);
     });
 
     it('POST /snippets/:id/like - Owner Likes (201)', () => {
-        return request(app.getHttpServer()).post(`/api/snippets/${snippetId}/like`)
-            .set('Authorization', `Bearer ${ownerToken}`).expect(201);
+      return request(app.getHttpServer()).post(`/api/snippets/${snippetId}/like`)
+        .set('Authorization', `Bearer ${ownerToken}`).expect(201);
     });
 
     // 🔒 DELETE SECURITY (Moderation)
@@ -227,8 +227,8 @@ describe('AppController (e2e) - Complete Security Matrix', () => {
 
     // 🔴 GET SINGLE USER (Missing from short version)
     it('GET /users/:id - Owner views self (200)', () => {
-         return request(app.getHttpServer()).get(`/api/users/${ownerUserId}`)
-             .set('Authorization', `Bearer ${ownerToken}`).expect(200);
+      return request(app.getHttpServer()).get(`/api/users/${ownerUserId}`)
+        .set('Authorization', `Bearer ${ownerToken}`).expect(200);
     });
 
     // 🔒 DELETE SECURITY
@@ -242,16 +242,15 @@ describe('AppController (e2e) - Complete Security Matrix', () => {
       return request(app.getHttpServer()).delete(`/api/users/${ownerUserId}`)
         .set('Authorization', `Bearer ${ownerToken}`).expect(200);
     });
-  });
 
-  it('DELETE /users/:id - Admin deletes Hacker (200)', async () => {
+    it('DELETE /users/:id - Admin deletes Hacker (200)', async () => {
       const res = await request(app.getHttpServer())
         .get('/api/users')
         .set('Authorization', `Bearer ${adminToken}`)
         .expect(200);
 
       const hackerUser = res.body.find(u => u.username.startsWith('hacker_'));
-      
+
       if (hackerUser) {
         return request(app.getHttpServer())
           .delete(`/api/users/${hackerUser.id}`)
@@ -259,6 +258,7 @@ describe('AppController (e2e) - Complete Security Matrix', () => {
           .expect(200);
       }
     });
+  });
 
   afterAll(async () => {
     await app.close();

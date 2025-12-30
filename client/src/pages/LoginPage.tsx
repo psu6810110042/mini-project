@@ -31,9 +31,9 @@ const LoginPage: React.FC = () => {
 
       message.success("Login successful!");
       navigate("/");
-
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : "Invalid username or password";
+      const errorMessage =
+        err instanceof Error ? err.message : "Invalid username or password";
       setError(errorMessage);
       message.error(errorMessage);
     } finally {
@@ -50,9 +50,7 @@ const LoginPage: React.FC = () => {
         minHeight: "100vh",
       }}
     >
-      <Card
-        style={{ width: 400, boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }}
-      >
+      <Card style={{ width: 400, boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }}>
         <div style={{ textAlign: "center", marginBottom: 24 }}>
           <Title level={2}>Welcome Back</Title>
           <Text type="secondary">Please login to your account</Text>
@@ -101,7 +99,7 @@ const LoginPage: React.FC = () => {
               htmlType="submit"
               className="login-form-button"
               block
-              loading={loading} 
+              loading={loading}
             >
               Log in
             </Button>

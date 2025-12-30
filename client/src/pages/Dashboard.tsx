@@ -10,7 +10,6 @@ import {
   Select,
   Typography,
   Tag,
-  // List, // Removed List import
   message,
   Modal,
   Space,
@@ -18,7 +17,7 @@ import {
   Divider,
   Avatar,
   Empty,
-  theme // 1. Import theme
+  theme,
 } from "antd";
 import {
   SearchOutlined,
@@ -35,7 +34,7 @@ import {
   CodeOutlined,
   FireOutlined,
   CloseCircleFilled,
-  SafetyCertificateOutlined
+  SafetyCertificateOutlined,
 } from "@ant-design/icons";
 
 import {
@@ -46,8 +45,11 @@ import {
   updateCodeService,
 } from "../services/codeService";
 import type { CodeSnippet, User } from "../types";
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { vscDarkPlus, vs } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import {
+  vscDarkPlus,
+  vs,
+} from "react-syntax-highlighter/dist/esm/styles/prism";
 
 const { Header, Content } = Layout;
 const { Title, Text } = Typography;
@@ -57,29 +59,24 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const { id } = useParams();
 
-  // 2. Access Design Tokens
   const { token } = theme.useToken();
 
-  // --- State ---
   const [codes, setCodes] = useState<CodeSnippet[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(false);
 
-  // Search State
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<CodeSnippet[]>([]);
 
-  // Form States
   const [titleInput, setTitleInput] = useState("");
   const [contentInput, setContentInput] = useState("");
   const [langInput, setLangInput] = useState("javascript");
-  const [visibilityInput, setVisibilityInput] = useState<"PUBLIC" | "PRIVATE">("PUBLIC");
+  const [visibilityInput, setVisibilityInput] = useState<"PUBLIC" | "PRIVATE">(
+    "PUBLIC",
+  );
   const [tagsInput, setTagsInput] = useState("");
 
   const [selectedCode, setSelectedCode] = useState<CodeSnippet | null>(null);
   const [isEditing, setIsEditing] = useState(false);
-
-  // --- Effects ---
 
   useEffect(() => {
     const storedUserStr = localStorage.getItem("user");
@@ -96,25 +93,23 @@ const Dashboard = () => {
     fetchData();
   }, [id]);
 
-  // Real-time search filtering
   useEffect(() => {
     if (!searchQuery.trim()) {
       setSearchResults([]);
       return;
     }
     const query = searchQuery.toLowerCase();
-    const filtered = codes.filter(code =>
-      code.title.toLowerCase().includes(query) ||
-      code.language.toLowerCase().includes(query) ||
-      (code.tags && code.tags.some(t => t.name.toLowerCase().includes(query)))
+    const filtered = codes.filter(
+      (code) =>
+        code.title.toLowerCase().includes(query) ||
+        code.language.toLowerCase().includes(query) ||
+        (code.tags &&
+          code.tags.some((t) => t.name.toLowerCase().includes(query))),
     );
     setSearchResults(filtered);
   }, [searchQuery, codes]);
 
-  // --- Logic ---
-
   const fetchData = async () => {
-    setLoading(true);
     try {
       const data = await getCodes();
       if (Array.isArray(data)) {
@@ -127,7 +122,6 @@ const Dashboard = () => {
     } catch (error) {
       console.error("Failed to fetch codes");
     } finally {
-      setLoading(false);
     }
   };
 
@@ -136,20 +130,19 @@ const Dashboard = () => {
     oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
 
     return codes
-      .filter(code => {
-        // Must be Public AND created in the last 7 days
+      .filter((code) => {
         const created = new Date(code.createdAt);
-        return code.visibility === 'PUBLIC' && created > oneWeekAgo;
+        return code.visibility === "PUBLIC" && created > oneWeekAgo;
       })
       .sort((a, b) => {
-        // Sort by Likes (Highest first)
-        // If likes are equal, sort by newest
         if (b.likes.length !== a.likes.length) {
           return b.likes.length - a.likes.length;
         }
-        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        return (
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
       })
-      .slice(0, 5); // Top 5 only
+      .slice(0, 5);
   }, [codes]);
 
   const handleLogout = () => {
@@ -177,7 +170,9 @@ const Dashboard = () => {
     setContentInput(selectedCode.content);
     setLangInput(selectedCode.language);
     setVisibilityInput(selectedCode.visibility);
-    setTagsInput(selectedCode.tags ? selectedCode.tags.map((t) => t.name).join(", ") : "");
+    setTagsInput(
+      selectedCode.tags ? selectedCode.tags.map((t) => t.name).join(", ") : "",
+    );
   };
 
   const handleSelectCode = (code: CodeSnippet) => {
@@ -187,16 +182,18 @@ const Dashboard = () => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  // --- API Actions ---
-
   const handleCreate = async () => {
-    if (!contentInput) return message.warning("Please enter some code content!");
+    if (!contentInput)
+      return message.warning("Please enter some code content!");
 
     const titleToSend = currentUser ? titleInput || "Untitled" : "Untitled";
     const langToSend = currentUser ? langInput : "text";
 
     try {
-      const tagsArray = tagsInput.split(",").map((t) => t.trim()).filter((t) => t !== "");
+      const tagsArray = tagsInput
+        .split(",")
+        .map((t) => t.trim())
+        .filter((t) => t !== "");
       await createCodeService({
         title: titleToSend,
         content: contentInput,
@@ -209,7 +206,8 @@ const Dashboard = () => {
       resetToCreateMode();
       fetchData();
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to create paste";
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to create paste";
       message.error(errorMessage);
     }
   };
@@ -217,7 +215,10 @@ const Dashboard = () => {
   const handleUpdate = async () => {
     if (!selectedCode) return;
     try {
-      const tagsArray = tagsInput.split(",").map((t) => t.trim()).filter((t) => t !== "");
+      const tagsArray = tagsInput
+        .split(",")
+        .map((t) => t.trim())
+        .filter((t) => t !== "");
 
       await updateCodeService(selectedCode.id, {
         title: titleInput,
@@ -230,7 +231,7 @@ const Dashboard = () => {
       message.success("Paste updated!");
       const freshData = await getCodes();
       setCodes(freshData);
-      const updatedItem = freshData.find(c => c.id === selectedCode.id);
+      const updatedItem = freshData.find((c) => c.id === selectedCode.id);
       if (updatedItem) setSelectedCode(updatedItem);
       setIsEditing(false);
     } catch (err) {
@@ -264,26 +265,28 @@ const Dashboard = () => {
     const updatedCodes = await getCodes();
     setCodes(updatedCodes);
     if (selectedCode?.id === id) {
-      const updatedItem = updatedCodes.find(c => c.id === id);
+      const updatedItem = updatedCodes.find((c) => c.id === id);
       if (updatedItem) setSelectedCode(updatedItem);
     }
   };
 
-  // --- Render Helpers ---
-
   const renderEditorOrView = () => {
-    // Determine if we are in Dark Mode based on Ant Design's token
-    const isDarkMode = token.colorBgContainer === '#141414' || token.colorBgLayout === '#000000';
+    const isDarkMode =
+      token.colorBgContainer === "#141414" || token.colorBgLayout === "#000000";
 
     if (selectedCode && !isEditing) {
       return (
         <Card
-          style={{ height: '100%' }}
+          style={{ height: "100%" }}
           title={
             <Space>
-              <Title level={4} style={{ margin: 0 }}>{selectedCode.title}</Title>
+              <Title level={4} style={{ margin: 0 }}>
+                {selectedCode.title}
+              </Title>
               <Tag color="blue">{selectedCode.language}</Tag>
-              {selectedCode.visibility === 'PRIVATE' && <Tag color="gold">Private</Tag>}
+              {selectedCode.visibility === "PRIVATE" && (
+                <Tag color="gold">Private</Tag>
+              )}
             </Space>
           }
           extra={
@@ -291,22 +294,28 @@ const Dashboard = () => {
               <Button
                 type="text"
                 icon={
-                  currentUser && selectedCode.likes.some(u => u.id === currentUser.id)
-                    ? <HeartFilled style={{ color: 'red' }} />
-                    : <HeartOutlined />
+                  currentUser &&
+                  selectedCode.likes.some((u) => u.id === currentUser.id) ? (
+                    <HeartFilled style={{ color: "red" }} />
+                  ) : (
+                    <HeartOutlined />
+                  )
                 }
                 onClick={() => handleLike(selectedCode.id)}
               >
                 {selectedCode.likes.length}
               </Button>
-              <Text type="secondary" style={{ fontSize: '12px' }}>
-                By {selectedCode.author.username} • {new Date(selectedCode.createdAt).toLocaleDateString()}
+              <Text type="secondary" style={{ fontSize: "12px" }}>
+                By {selectedCode.author.username} •{" "}
+                {new Date(selectedCode.createdAt).toLocaleDateString()}
               </Text>
             </Space>
           }
         >
           <SyntaxHighlighter
-            language={selectedCode.language === 'text' ? 'text' : selectedCode.language}
+            language={
+              selectedCode.language === "text" ? "text" : selectedCode.language
+            }
             style={isDarkMode ? vscDarkPlus : vs}
             showLineNumbers={true}
             wrapLines={true}
@@ -314,31 +323,42 @@ const Dashboard = () => {
               margin: 0,
               borderRadius: token.borderRadius,
               border: `1px solid ${token.colorBorder}`,
-              fontSize: '14px',
-              backgroundColor: isDarkMode ? '#1e1e1e' : '#f5f5f5',
+              fontSize: "14px",
+              backgroundColor: isDarkMode ? "#1e1e1e" : "#f5f5f5",
             }}
             lineNumberStyle={{
-              minWidth: '2.5em',
-              paddingRight: '1em',
-              color: isDarkMode ? '#6e7681' : '#bfbfbf',
-              textAlign: 'right'
+              minWidth: "2.5em",
+              paddingRight: "1em",
+              color: isDarkMode ? "#6e7681" : "#bfbfbf",
+              textAlign: "right",
             }}
           >
             {selectedCode.content}
           </SyntaxHighlighter>
 
           <div style={{ marginTop: 16 }}>
-            {selectedCode.tags.map(tag => (
-              <Tag key={tag.id} color="geekblue">#{tag.name}</Tag>
+            {selectedCode.tags.map((tag) => (
+              <Tag key={tag.id} color="geekblue">
+                #{tag.name}
+              </Tag>
             ))}
           </div>
 
-          {(currentUser?.id === selectedCode.author.id || currentUser?.role === "ADMIN") && (
+          {(currentUser?.id === selectedCode.author.id ||
+            currentUser?.role === "ADMIN") && (
             <>
               <Divider />
               <Space>
-                <Button icon={<EditOutlined />} onClick={startEditMode}>Edit</Button>
-                <Button danger icon={<DeleteOutlined />} onClick={() => handleDelete(selectedCode.id)}>Delete</Button>
+                <Button icon={<EditOutlined />} onClick={startEditMode}>
+                  Edit
+                </Button>
+                <Button
+                  danger
+                  icon={<DeleteOutlined />}
+                  onClick={() => handleDelete(selectedCode.id)}
+                >
+                  Delete
+                </Button>
               </Space>
             </>
           )}
@@ -346,9 +366,12 @@ const Dashboard = () => {
       );
     }
 
-    // Create or Edit Mode
     return (
-      <Card title={isEditing ? "Edit Paste" : "New Paste"} variant={"outlined"} style={{ height: '100%' }}>
+      <Card
+        title={isEditing ? "Edit Paste" : "New Paste"}
+        variant={"outlined"}
+        style={{ height: "100%" }}
+      >
         <TextArea
           rows={20}
           placeholder="Paste your code here..."
@@ -356,9 +379,9 @@ const Dashboard = () => {
           onChange={(e) => setContentInput(e.target.value)}
           style={{
             fontFamily: "'Consolas', 'Monaco', monospace",
-            fontSize: '14px',
-            resize: 'none',
-            backgroundColor: token.colorFillQuaternary
+            fontSize: "14px",
+            resize: "none",
+            backgroundColor: token.colorFillQuaternary,
           }}
         />
 
@@ -369,33 +392,47 @@ const Dashboard = () => {
                 <Input
                   placeholder="Paste Title"
                   value={titleInput}
-                  onChange={e => setTitleInput(e.target.value)}
+                  onChange={(e) => setTitleInput(e.target.value)}
                   prefix={<CodeOutlined />}
                 />
               </Col>
               <Col span={12}>
                 <Select
-                  style={{ width: '100%' }}
+                  style={{ width: "100%" }}
                   value={langInput}
                   onChange={setLangInput}
                   options={[
-                    { value: 'javascript', label: 'JavaScript' },
-                    { value: 'typescript', label: 'TypeScript' },
-                    { value: 'python', label: 'Python' },
-                    { value: 'html', label: 'HTML' },
-                    { value: 'css', label: 'CSS' },
-                    { value: 'text', label: 'Plain Text' },
+                    { value: "javascript", label: "JavaScript" },
+                    { value: "typescript", label: "TypeScript" },
+                    { value: "python", label: "Python" },
+                    { value: "html", label: "HTML" },
+                    { value: "css", label: "CSS" },
+                    { value: "text", label: "Plain Text" },
                   ]}
                 />
               </Col>
               <Col span={12}>
                 <Select
-                  style={{ width: '100%' }}
+                  style={{ width: "100%" }}
                   value={visibilityInput}
                   onChange={setVisibilityInput}
                   options={[
-                    { value: 'PUBLIC', label: <span><GlobalOutlined /> Public</span> },
-                    { value: 'PRIVATE', label: <span><LockOutlined /> Private</span> },
+                    {
+                      value: "PUBLIC",
+                      label: (
+                        <span>
+                          <GlobalOutlined /> Public
+                        </span>
+                      ),
+                    },
+                    {
+                      value: "PRIVATE",
+                      label: (
+                        <span>
+                          <LockOutlined /> Private
+                        </span>
+                      ),
+                    },
                   ]}
                 />
               </Col>
@@ -403,7 +440,7 @@ const Dashboard = () => {
                 <Input
                   placeholder="Tags (comma separated, e.g. react, api)"
                   value={tagsInput}
-                  onChange={e => setTagsInput(e.target.value)}
+                  onChange={(e) => setTagsInput(e.target.value)}
                 />
               </Col>
             </Row>
@@ -421,7 +458,9 @@ const Dashboard = () => {
               </Button>
 
               {isEditing && (
-                <Button size="large" onClick={() => setIsEditing(false)}>Cancel</Button>
+                <Button size="large" onClick={() => setIsEditing(false)}>
+                  Cancel
+                </Button>
               )}
             </Space>
           </div>
@@ -435,89 +474,135 @@ const Dashboard = () => {
   };
 
   return (
-    <Layout style={{ minHeight: '100vh', background: token.colorBgLayout }}>
-      {/* 1. Navbar */}
-      <Header style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        padding: '0 24px',
-        background: token.colorBgContainer,
-        borderBottom: `1px solid ${token.colorBorder}`
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }} onClick={resetToCreateMode}>
-          <Title level={3} style={{ margin: 0 }}>NESTBIN</Title>
+    <Layout style={{ minHeight: "100vh", background: token.colorBgLayout }}>
+      <Header
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "0 24px",
+          background: token.colorBgContainer,
+          borderBottom: `1px solid ${token.colorBorder}`,
+        }}
+      >
+        <div
+          style={{ display: "flex", alignItems: "center", cursor: "pointer" }}
+          onClick={resetToCreateMode}
+        >
+          <Title level={3} style={{ margin: 0 }}>
+            NESTBIN
+          </Title>
         </div>
 
-        {/* SEARCH BAR & DROPDOWN */}
-        <div style={{ position: 'relative', flex: 1, margin: '0 40px', maxWidth: '800px' }}>
+        <div
+          style={{
+            position: "relative",
+            flex: 1,
+            margin: "0 40px",
+            maxWidth: "800px",
+          }}
+        >
           <Input
-            prefix={<SearchOutlined style={{ color: token.colorTextPlaceholder }} />}
+            prefix={
+              <SearchOutlined style={{ color: token.colorTextPlaceholder }} />
+            }
             placeholder="Search by Title, Language, or Tag..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             allowClear
-            style={{ width: '100%' }}
+            style={{ width: "100%" }}
           />
-          {/* SEARCH RESULTS OVERLAY */}
           {searchQuery && (
             <Card
               style={{
-                position: 'absolute',
-                top: '100%',
-                width: '100%',
+                position: "absolute",
+                top: "100%",
+                width: "100%",
                 zIndex: 1000,
                 boxShadow: token.boxShadowSecondary,
-                maxHeight: '400px',
-                borderRadius: '8px',
+                maxHeight: "400px",
+                borderRadius: "8px",
                 background: token.colorBgElevated,
               }}
-              bodyStyle={{ padding: 0 }} // Remove default padding for custom list
+              bodyStyle={{ padding: 0 }}
             >
-              <div style={{
-                padding: '8px 16px',
-                background: token.colorFillAlter,
-                borderBottom: `1px solid ${token.colorBorder}`,
-                display: 'flex',
-                justifyContent: 'space-between'
-              }}>
-                <Text type="secondary" style={{ fontSize: 12 }}>Found {searchResults.length} results</Text>
-                <CloseCircleFilled onClick={() => setSearchQuery("")} style={{ cursor: 'pointer', color: token.colorTextDescription }} />
+              <div
+                style={{
+                  padding: "8px 16px",
+                  background: token.colorFillAlter,
+                  borderBottom: `1px solid ${token.colorBorder}`,
+                  display: "flex",
+                  justifyContent: "space-between",
+                }}
+              >
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  Found {searchResults.length} results
+                </Text>
+                <CloseCircleFilled
+                  onClick={() => setSearchQuery("")}
+                  style={{
+                    cursor: "pointer",
+                    color: token.colorTextDescription,
+                  }}
+                />
               </div>
-              
+
               {searchResults.length === 0 ? (
-                <Empty description="No matching pastes found" image={Empty.PRESENTED_IMAGE_SIMPLE} style={{ padding: 20 }} />
+                <Empty
+                  description="No matching pastes found"
+                  image={Empty.PRESENTED_IMAGE_SIMPLE}
+                  style={{ padding: 20 }}
+                />
               ) : (
-                /* REPLACED List WITH Map */
-                <div style={{ maxHeight: '350px', overflowY: 'auto' }}>
+                <div style={{ maxHeight: "350px", overflowY: "auto" }}>
                   {searchResults.map((item) => (
                     <div
                       key={item.id}
                       style={{
-                        padding: '10px 16px',
-                        cursor: 'pointer',
+                        padding: "10px 16px",
+                        cursor: "pointer",
                         borderBottom: `1px solid ${token.colorSplit}`,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between'
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
                       }}
-                      onMouseEnter={(e) => e.currentTarget.style.background = token.colorFillTertiary}
-                      onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                      onMouseEnter={(e) =>
+                        (e.currentTarget.style.background =
+                          token.colorFillTertiary)
+                      }
+                      onMouseLeave={(e) =>
+                        (e.currentTarget.style.background = "transparent")
+                      }
                       onClick={() => {
                         handleSelectCode(item);
                         navigate(`/snippet/${item.id}`);
                       }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <Avatar size="small" style={{ backgroundColor: token.colorPrimary }} icon={<CodeOutlined />} />
-                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 12,
+                        }}
+                      >
+                        <Avatar
+                          size="small"
+                          style={{ backgroundColor: token.colorPrimary }}
+                          icon={<CodeOutlined />}
+                        />
+                        <div
+                          style={{ display: "flex", flexDirection: "column" }}
+                        >
                           <Text strong>{item.title || "Untitled"}</Text>
                           <Text type="secondary" style={{ fontSize: 12 }}>
-                            {item.language} • {new Date(item.createdAt).toLocaleDateString()}
+                            {item.language} •{" "}
+                            {new Date(item.createdAt).toLocaleDateString()}
                           </Text>
                         </div>
                       </div>
-                      {item.visibility === 'PRIVATE' && <Tag color="gold">Private</Tag>}
+                      {item.visibility === "PRIVATE" && (
+                        <Tag color="gold">Private</Tag>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -527,36 +612,55 @@ const Dashboard = () => {
         </div>
 
         <Space>
-          <Button type="primary" icon={<PlusOutlined />} onClick={resetToCreateMode}>New Paste</Button>
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={resetToCreateMode}
+          >
+            New Paste
+          </Button>
           {currentUser ? (
             <>
-              {currentUser.role === 'ADMIN' && (
+              {currentUser.role === "ADMIN" && (
                 <Button
                   type="primary"
                   danger
                   icon={<SafetyCertificateOutlined />}
-                  onClick={() => navigate('/admin')}
+                  onClick={() => navigate("/admin")}
                 >
                   Admin Panel
                 </Button>
               )}
-              <Text><UserOutlined /> {currentUser.username}</Text>
-              <Button type="text" icon={<LogoutOutlined />} onClick={handleLogout}>Logout</Button>
+              <Text>
+                <UserOutlined /> {currentUser.username}
+              </Text>
+              <Button
+                type="text"
+                icon={<LogoutOutlined />}
+                onClick={handleLogout}
+              >
+                Logout
+              </Button>
             </>
           ) : (
             <>
-              <Button type="default" icon={<LoginOutlined />} onClick={() => navigate("/login")}>Login</Button>
-              <Button type="primary" onClick={() => navigate("/register")}>Register</Button>
+              <Button
+                type="default"
+                icon={<LoginOutlined />}
+                onClick={() => navigate("/login")}
+              >
+                Login
+              </Button>
+              <Button type="primary" onClick={() => navigate("/register")}>
+                Register
+              </Button>
             </>
           )}
         </Space>
       </Header>
 
-      {/* 2. Main Content */}
       <Content style={{ padding: "24px", width: "100%" }}>
         <Row gutter={24}>
-
-          {/* LEFT COLUMN: Editor / View */}
           <Col xs={24} md={18} lg={19}>
             {!currentUser && !selectedCode && (
               <Alert
@@ -567,8 +671,16 @@ const Dashboard = () => {
                 style={{ marginBottom: 24 }}
                 action={
                   <Space>
-                    <Button size="small" type="primary" onClick={() => navigate('/register')}>Sign Up</Button>
-                    <Button size="small" onClick={() => navigate('/login')}>Login</Button>
+                    <Button
+                      size="small"
+                      type="primary"
+                      onClick={() => navigate("/register")}
+                    >
+                      Sign Up
+                    </Button>
+                    <Button size="small" onClick={() => navigate("/login")}>
+                      Login
+                    </Button>
                   </Space>
                 }
               />
@@ -576,60 +688,90 @@ const Dashboard = () => {
             {renderEditorOrView()}
           </Col>
 
-          {/* RIGHT COLUMN: Sidebar (Always Latest 5) */}
           <Col xs={24} md={6} lg={5}>
             <Card
-              title={<span><FireOutlined style={{ color: 'orange' }} /> Trending (Week)</span>}
-              bodyStyle={{ padding: 0 }} // Remove default padding to let map items touch edges
+              title={
+                <span>
+                  <FireOutlined style={{ color: "orange" }} /> Trending (Week)
+                </span>
+              }
+              bodyStyle={{ padding: 0 }}
             >
-              {/* REPLACED List WITH Map */}
-              <div style={{ maxHeight: '80vh', overflowY: 'auto' }}>
+              <div style={{ maxHeight: "80vh", overflowY: "auto" }}>
                 {trendingCodes.length > 0 ? (
                   trendingCodes.map((item, index) => (
                     <div
                       key={item.id}
                       style={{
-                        padding: '12px 16px',
-                        cursor: 'pointer',
-                        background: selectedCode?.id === item.id ? token.colorPrimaryBg : 'transparent',
+                        padding: "12px 16px",
+                        cursor: "pointer",
+                        background:
+                          selectedCode?.id === item.id
+                            ? token.colorPrimaryBg
+                            : "transparent",
                         borderBottom: `1px solid ${token.colorSplit}`,
-                        display: 'flex',
+                        display: "flex",
                         gap: 12,
-                        alignItems: 'center',
-                        transition: 'background 0.3s'
+                        alignItems: "center",
+                        transition: "background 0.3s",
                       }}
                       onClick={() => {
                         handleSelectCode(item);
                         navigate(`/snippet/${item.id}`);
                       }}
                     >
-                      {/* Avatar / Rank */}
                       <Avatar
                         size="small"
                         style={{
-                          backgroundColor: index === 0 ? '#ffbf00' : token.colorFillContent,
-                          color: index === 0 ? 'white' : token.colorText,
-                          flexShrink: 0
+                          backgroundColor:
+                            index === 0 ? "#ffbf00" : token.colorFillContent,
+                          color: index === 0 ? "white" : token.colorText,
+                          flexShrink: 0,
                         }}
                       >
                         {index + 1}
                       </Avatar>
 
-                      {/* Content Area */}
-                      <div style={{ flex: 1, overflow: 'hidden' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                          <Text strong style={{ fontSize: 13 }} ellipsis>{item.title || "Untitled"}</Text>
-                          <Space size={4} style={{ fontSize: 12, color: token.colorTextSecondary, flexShrink: 0 }}>
-                            <HeartFilled style={{ color: 'red', fontSize: 10 }} />
+                      <div style={{ flex: 1, overflow: "hidden" }}>
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            marginBottom: 4,
+                          }}
+                        >
+                          <Text strong style={{ fontSize: 13 }} ellipsis>
+                            {item.title || "Untitled"}
+                          </Text>
+                          <Space
+                            size={4}
+                            style={{
+                              fontSize: 12,
+                              color: token.colorTextSecondary,
+                              flexShrink: 0,
+                            }}
+                          >
+                            <HeartFilled
+                              style={{ color: "red", fontSize: 10 }}
+                            />
                             {item.likes.length}
                           </Space>
                         </div>
-                        <Tag style={{ margin: 0, fontSize: 10 }}>{item.language}</Tag>
+                        <Tag style={{ margin: 0, fontSize: 10 }}>
+                          {item.language}
+                        </Tag>
                       </div>
                     </div>
                   ))
                 ) : (
-                  <div style={{ padding: 20, textAlign: 'center', color: token.colorTextDescription }}>
+                  <div
+                    style={{
+                      padding: 20,
+                      textAlign: "center",
+                      color: token.colorTextDescription,
+                    }}
+                  >
                     No trending posts this week
                   </div>
                 )}

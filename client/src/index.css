@@ -13,5 +13,5 @@
   transition: background-color 0.2s;
 }
 .search-result-item:hover {
-  background-color: #223356 !important; /* Light Blue highlight on hover */
+  background-color: #223356 !important;
 }

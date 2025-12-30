@@ -14,7 +14,7 @@ import { Tag } from "../../tags/entities/tag.entity";
 @Entity()
 export class Snippet {
   @PrimaryColumn()
-  id: string; // NanoID
+  id: string;
 
   @Column()
   title: string;
@@ -28,16 +28,14 @@ export class Snippet {
   @Column({ default: "PUBLIC" })
   visibility: "PUBLIC" | "PRIVATE";
 
-  // 1:N Relation
   @ManyToOne(() => User, (user) => user.snippets, {
-    onDelete: "CASCADE", // 👈 ADD THIS OPTION
+    onDelete: "CASCADE",
   })
   author: User;
 
   @Column()
-  authorId: number; // Useful helper column
+  authorId: number;
 
-  // N:M Relation
   @ManyToMany(() => Tag, (tag) => tag.snippets, { cascade: ["insert"] })
   @JoinTable()
   tags: Tag[];

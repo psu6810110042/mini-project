@@ -1,13 +1,13 @@
-import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm'; // <--- Import this
-import { TagsService } from './tags.service';
-import { TagsController } from './tags.controller';
-import { Tag } from './entities/tag.entity'; // <--- Import Entity
+import { Module } from "@nestjs/common";
+import { TypeOrmModule } from "@nestjs/typeorm";
+import { TagsService } from "./tags.service";
+import { TagsController } from "./tags.controller";
+import { Tag } from "./entities/tag.entity";
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Tag])], // <--- Register Repository
+  imports: [TypeOrmModule.forFeature([Tag])],
   controllers: [TagsController],
   providers: [TagsService],
-  exports: [TagsService], // Exporting is good practice in case other modules need it
+  exports: [TagsService],
 })
 export class TagsModule {}

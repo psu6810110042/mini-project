@@ -9,7 +9,6 @@ import Dashboard from "./pages/Dashboard";
 import AdminPanel from "./pages/AdminPanel";
 
 function App() {
-  // 1. Initialize State from LocalStorage (Fixes "Doesn't Save")
   const [isDarkMode, setIsDarkMode] = useState(() => {
     const savedMode = localStorage.getItem("isDarkMode");
     return savedMode === "true";
@@ -17,16 +16,12 @@ function App() {
 
   const { defaultAlgorithm, darkAlgorithm } = theme;
 
-  // 2. Effect to handle Body Background & Persistence
   useEffect(() => {
-    // Save to LocalStorage
     localStorage.setItem("isDarkMode", isDarkMode.toString());
 
-    // Fix the "White Background" issue manually
-    // Ant Design's dark mode uses #000000 for body and #141414 for components
     if (isDarkMode) {
       document.body.style.backgroundColor = "#000000";
-      document.body.style.color = "#ffffff"; // Fixes text color outside components
+      document.body.style.color = "#ffffff";
     } else {
       document.body.style.backgroundColor = "#ffffff";
       document.body.style.color = "#000000";
@@ -37,19 +32,12 @@ function App() {
     <ConfigProvider
       theme={{
         algorithm: isDarkMode ? darkAlgorithm : defaultAlgorithm,
-        // Optional: Customize tokens if you want specific colors
         token: {
           colorPrimary: "#1890ff",
         },
       }}
     >
-      {/* Make Layout transparent so it shows the body color we set above,
-         OR let Layout handle the container background. 
-         We set background: 'transparent' here to let the body color shine through.
-      */}
-      <Layout style={{ minHeight: "100vh", background: 'transparent' }}>
-        
-        {/* Toggle Button */}
+      <Layout style={{ minHeight: "100vh", background: "transparent" }}>
         <div style={{ position: "fixed", bottom: 20, right: 20, zIndex: 1000 }}>
           <Button
             shape="circle"
@@ -67,7 +55,6 @@ function App() {
           <Route path="/admin" element={<AdminPanel />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
-
       </Layout>
     </ConfigProvider>
   );
