@@ -1,0 +1,79 @@
+services:
+  cloudflare:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --url http://frontend:5173
+    environment:
+      TUNNEL_TOKEN: eyJhIjoiNjU5ZDk0NzMwZDVjMWYwN2RhMjBkN2E1MjM2NGY1NzQiLCJ0IjoiZDk4YTMzZTEtYTJjYS00NTk5LWIyODQtZTBhZmRlM2NmYTdiIiwicyI6IlpHWmtNekJrTm1JdFpEWTJOQzAwTVdZNUxXRmlaV1F0TnpSaU0yUXpZelE0Tm1GbCJ9
+    networks:
+      - nestbin-network-dev
+      
+  db:
+    image: postgres:15-alpine
+    container_name: postgres-nestbin
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: adminkhet
+      POSTGRES_PASSWORD: khetgamerthailand
+      POSTGRES_DB: nestbin
+    ports:
+      - '5432:5432'
+    networks:
+      - nestbin-network-dev
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  server:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: backend
+    restart: unless-stopped
+    ports:
+      - '3000:3000'
+    volumes:
+      # Mount source code for hot reload
+      - ./backend/src:/app/src
+      - ./backend/tsconfig.json:/app/tsconfig.json
+      - ./backend/tsconfig.build.json:/app/tsconfig.build.json
+      - ./backend/nest-cli.json:/app/nest-cli.json
+    environment:
+      DB_HOST: db 
+      DB_PORT: 5432
+      DB_USER: adminkhet
+      DB_PASS: khetgamerthailand
+      DB_NAME: nestbin
+      JWT_SECRET: "super_secret_key_change_this"
+    depends_on:
+      - db
+    networks:
+      - nestbin-network-dev
+      
+  client:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: frontend
+    restart: unless-stopped
+    ports:
+      - '5173:5173'
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public          # Added
+      - ./frontend/index.html:/app/index.html  # Added
+      - ./frontend/tsconfig.json:/app/tsconfig.json
+      - ./frontend/tsconfig.app.json:/app/tsconfig.app.json
+      - ./frontend/vite.config.ts:/app/vite.config.ts
+    environment:
+      - VITE_API_URL=http://localhost:3000
+    depends_on:
+      - server
+    networks:
+      - nestbin-network-dev
+
+volumes:
+  postgres_data:
+
+networks:
+  nestbin-network-dev:
+    driver: bridge
