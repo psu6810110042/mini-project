@@ -21,26 +21,20 @@ import {
     Grid,
 } from "antd";
 import {
-    SearchOutlined,
     PlusOutlined,
-    LogoutOutlined,
-    LoginOutlined,
-    UserOutlined,
-    HeartOutlined,
+    WifiOutlined,
     HeartFilled,
+    HeartOutlined,
     EditOutlined,
     DeleteOutlined,
     GlobalOutlined,
     LockOutlined,
     CodeOutlined,
     FireOutlined,
-    CloseCircleFilled,
-    SafetyCertificateOutlined,
     FileTextOutlined,
-    UserAddOutlined,
-    WifiOutlined,
 } from "@ant-design/icons";
-import { nanoid } from "nanoid";
+import { io, Socket } from "socket.io-client";
+import AppHeader from "../components/AppHeader";
 
 import {
     getCodes,
@@ -56,7 +50,7 @@ import {
     vs,
 } from "react-syntax-highlighter/dist/esm/styles/prism";
 
-const { Header, Content } = Layout;
+const { Content } = Layout;
 const { Title, Text } = Typography;
 const { TextArea } = Input;
 const { useBreakpoint } = Grid;
@@ -85,6 +79,9 @@ const Dashboard = () => {
     const [selectedCode, setSelectedCode] = useState<CodeSnippet | null>(null);
     const [isEditing, setIsEditing] = useState(false);
 
+    const [activeSessions, setActiveSessions] = useState<any[]>([]);
+    const [socket, setSocket] = useState<Socket | null>(null);
+
     useEffect(() => {
         const storedUserStr = localStorage.getItem("user");
         if (storedUserStr) {
@@ -98,6 +95,31 @@ const Dashboard = () => {
 
     useEffect(() => {
         fetchData();
+
+        // Connect to socket for active sessions
+        const token = localStorage.getItem("token");
+        // We allow anonymous connection to dashboard resource generally, but if auth is needed:
+        // For now, let's just connect. If token exists, pass it.
+
+        const newSocket = io({
+            transports: ["websocket"],
+            auth: token ? { token } : {},
+        });
+        setSocket(newSocket);
+
+        newSocket.on("connect", () => {
+            console.log("Connected to WebSocket from Dashboard");
+            newSocket.emit("join-dashboard");
+        });
+
+        newSocket.on("active-sessions-update", (sessions: any[]) => {
+            // sessions is an array of [id, metadata] entries
+            setActiveSessions(sessions);
+        });
+
+        return () => {
+            newSocket.disconnect();
+        };
     }, [id]);
 
     useEffect(() => {
@@ -293,10 +315,7 @@ const Dashboard = () => {
         }
     };
 
-    const handleStartLiveSession = () => {
-        const sessionId = nanoid(10);
-        navigate(`/live/${sessionId}`);
-    };
+
 
     const renderEditorOrView = () => {
         const isDarkMode =
@@ -324,9 +343,9 @@ const Dashboard = () => {
                                 type="text"
                                 icon={
                                     currentUser &&
-                                    selectedCode.likes.some(
-                                        (u) => u.id === currentUser.id,
-                                    ) ? (
+                                        selectedCode.likes.some(
+                                            (u) => u.id === currentUser.id,
+                                        ) ? (
                                         <HeartFilled style={{ color: "red" }} />
                                     ) : (
                                         <HeartOutlined />
@@ -381,27 +400,27 @@ const Dashboard = () => {
 
                     {(currentUser?.id === selectedCode.author.id ||
                         currentUser?.role === "ADMIN") && (
-                        <>
-                            <Divider />
-                            <Space>
-                                <Button
-                                    icon={<EditOutlined />}
-                                    onClick={startEditMode}
-                                >
-                                    Edit
-                                </Button>
-                                <Button
-                                    danger
-                                    icon={<DeleteOutlined />}
-                                    onClick={() =>
-                                        handleDelete(selectedCode.id)
-                                    }
-                                >
-                                    Delete
-                                </Button>
-                            </Space>
-                        </>
-                    )}
+                            <>
+                                <Divider />
+                                <Space>
+                                    <Button
+                                        icon={<EditOutlined />}
+                                        onClick={startEditMode}
+                                    >
+                                        Edit
+                                    </Button>
+                                    <Button
+                                        danger
+                                        icon={<DeleteOutlined />}
+                                        onClick={() =>
+                                            handleDelete(selectedCode.id)
+                                        }
+                                    >
+                                        Delete
+                                    </Button>
+                                </Space>
+                            </>
+                        )}
                 </Card>
             );
         }
@@ -538,235 +557,82 @@ const Dashboard = () => {
 
     return (
         <Layout style={{ minHeight: "100vh", background: token.colorBgLayout }}>
-            <Header
-                style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    padding: `0 ${screens.md ? "24px" : "16px"}`,
-                    background: token.colorBgContainer,
-                    borderBottom: `1px solid ${token.colorBorder}`,
+            <AppHeader
+                currentUser={currentUser}
+                onLogout={handleLogout}
+                onResetToCreateMode={resetToCreateMode}
+                searchQuery={searchQuery}
+                setSearchQuery={setSearchQuery}
+                searchResults={searchResults}
+                showSearch={true}
+                onSelectCode={(code) => {
+                    handleSelectCode(code);
+                    // AppHeader handles navigate but we might want to ensure state is set
                 }}
-            >
-                <div
-                    style={{
-                        display: "flex",
-                        alignItems: "center",
-                        cursor: "pointer",
-                    }}
-                    onClick={resetToCreateMode}
-                >
-                    <Title level={3} style={{ margin: 0 }}>
-                        NESTBIN
-                    </Title>
-                </div>
-
-                <div
-                    style={{
-                        position: "relative",
-                        flex: 1,
-                        margin: `0 ${screens.md ? "40px" : "16px"}`,
-                        maxWidth: "800px",
-                    }}
-                >
-                    <Input
-                        prefix={
-                            <SearchOutlined
-                                style={{ color: token.colorTextPlaceholder }}
-                            />
-                        }
-                        placeholder="Search..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        allowClear
-                        style={{ width: "100%" }}
-                    />
-                    {searchQuery && (
-                        <Card
-                            style={{
-                                position: "absolute",
-                                top: "100%",
-                                width: "100%",
-                                zIndex: 1000,
-                                boxShadow: token.boxShadowSecondary,
-                                maxHeight: "400px",
-                                borderRadius: "8px",
-                                background: token.colorBgElevated,
-                            }}
-                            bodyStyle={{ padding: 0 }}
-                        >
-                            <div
-                                style={{
-                                    padding: "8px 16px",
-                                    background: token.colorFillAlter,
-                                    borderBottom: `1px solid ${token.colorBorder}`,
-                                    display: "flex",
-                                    justifyContent: "space-between",
-                                }}
-                            >
-                                <Text type="secondary" style={{ fontSize: 12 }}>
-                                    Found {searchResults.length} results
-                                </Text>
-                                <CloseCircleFilled
-                                    onClick={() => setSearchQuery("")}
-                                    style={{
-                                        cursor: "pointer",
-                                        color: token.colorTextDescription,
-                                    }}
-                                />
-                            </div>
-
-                            {searchResults.length === 0 ? (
-                                <Empty
-                                    description="No matching pastes found"
-                                    image={Empty.PRESENTED_IMAGE_SIMPLE}
-                                    style={{ padding: 20 }}
-                                />
-                            ) : (
-                                <div
-                                    style={{
-                                        maxHeight: "350px",
-                                        overflowY: "auto",
-                                    }}
-                                >
-                                    {searchResults.map((item) => (
-                                        <div
-                                            key={item.id}
-                                            style={{
-                                                padding: "10px 16px",
-                                                cursor: "pointer",
-                                                borderBottom: `1px solid ${token.colorSplit}`,
-                                                display: "flex",
-                                                alignItems: "center",
-                                                justifyContent: "space-between",
-                                            }}
-                                            onMouseEnter={(e) =>
-                                                (e.currentTarget.style.background =
-                                                    token.colorFillTertiary)
-                                            }
-                                            onMouseLeave={(e) =>
-                                                (e.currentTarget.style.background =
-                                                    "transparent")
-                                            }
-                                            onClick={() => {
-                                                handleSelectCode(item);
-                                                navigate(`/snippet/${item.id}`);
-                                            }}
-                                        >
-                                            <div
-                                                style={{
-                                                    display: "flex",
-                                                    alignItems: "center",
-                                                    gap: 12,
-                                                }}
-                                            >
-                                                <Avatar
-                                                    size="small"
-                                                    style={{
-                                                        backgroundColor:
-                                                            token.colorPrimary,
-                                                    }}
-                                                    icon={<CodeOutlined />}
-                                                />
-                                                <div
-                                                    style={{
-                                                        display: "flex",
-                                                        flexDirection: "column",
-                                                    }}
-                                                >
-                                                    <Text strong>
-                                                        {item.title ||
-                                                            "Untitled"}
-                                                    </Text>
-                                                    <Text
-                                                        type="secondary"
-                                                        style={{ fontSize: 12 }}
-                                                    >
-                                                        {item.language} •{" "}
-                                                        {new Date(
-                                                            item.createdAt,
-                                                        ).toLocaleDateString()}
-                                                    </Text>
-                                                </div>
-                                            </div>
-                                            {item.visibility === "PRIVATE" && (
-                                                <Tag color="gold">Private</Tag>
-                                            )}
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </Card>
-                    )}
-                </div>
-
-                <Space>
-                    <Button
-                        type="primary"
-                        icon={<PlusOutlined />}
-                        onClick={resetToCreateMode}
-                    >
-                        {screens.md && "New Paste"}
-                    </Button>
-
-                    {currentUser ? (
-                        <Space>
-                            <Button
-                                icon={<WifiOutlined />}
-                                onClick={handleStartLiveSession}
-                            >
-                                {screens.md && "Live Session"}
-                            </Button>
-                            {currentUser.role === "ADMIN" && (
-                                <Button
-                                    icon={<SafetyCertificateOutlined />}
-                                    onClick={() => navigate("/admin")}
-                                >
-                                    {screens.md && "Admin"}
-                                </Button>
-                            )}
-
-                            {screens.md && (
-                                <Text>
-                                    <UserOutlined /> {currentUser.username}
-                                </Text>
-                            )}
-
-                            <Button
-                                type="text"
-                                icon={<LogoutOutlined />}
-                                onClick={handleLogout}
-                            >
-                                {screens.md && "Logout"}
-                            </Button>
-                        </Space>
-                    ) : (
-                        <Space>
-                            <Button
-                                type="default"
-                                icon={<LoginOutlined />}
-                                onClick={() => navigate("/login")}
-                            >
-                                {screens.sm && "Login"}
-                            </Button>
-
-                            <Button
-                                type="primary"
-                                icon={<UserAddOutlined />}
-                                onClick={() => navigate("/register")}
-                            >
-                                {screens.sm && "Register"}
-                            </Button>
-                        </Space>
-                    )}
-                </Space>
-            </Header>
+            />
 
             <Content
                 style={{ padding: screens.md ? "24px" : "16px", width: "100%" }}
             >
                 <Row gutter={[24, 24]}>
                     <Col xs={24} lg={18}>
+                        {activeSessions.length > 0 && (
+                            <Card
+                                title={
+                                    <Space>
+                                        <WifiOutlined style={{ color: "red" }} />
+                                        Live Now
+                                    </Space>
+                                }
+                                style={{ marginBottom: 24, borderColor: "red" }}
+                                styles={{ body: { padding: "12px 24px" } }}
+                            >
+                                {activeSessions.map(([sessionId, meta]) => (
+                                    <div
+                                        key={sessionId}
+                                        style={{
+                                            display: "flex",
+                                            justifyContent: "space-between",
+                                            alignItems: "center",
+                                            padding: "8px 0",
+                                            borderBottom: `1px solid ${token.colorSplit}`,
+                                            cursor: "pointer",
+                                        }}
+                                        onClick={() =>
+                                            navigate(`/live/${sessionId}`)
+                                        }
+                                    >
+                                        <Space>
+                                            <Avatar
+                                                style={{
+                                                    backgroundColor: "#f56a00",
+                                                }}
+                                            >
+                                                {meta.owner?.[0]?.toUpperCase() ||
+                                                    "?"}
+                                            </Avatar>
+                                            <div>
+                                                <Text strong>
+                                                    {meta.title || "Live Session"}
+                                                </Text>
+                                                <br />
+                                                <Text
+                                                    type="secondary"
+                                                    style={{ fontSize: 12 }}
+                                                >
+                                                    Host: {meta.owner} •{" "}
+                                                    {meta.language}
+                                                </Text>
+                                            </div>
+                                        </Space>
+                                        <Button size="small" type="primary" danger>
+                                            Join
+                                        </Button>
+                                    </div>
+                                ))}
+                            </Card>
+                        )}
+
                         {!currentUser && !selectedCode && (
                             <Alert
                                 description="Sign up or Login to save your pastes privately and edit them later."
@@ -816,7 +682,7 @@ const Dashboard = () => {
                                         Trending (Week)
                                     </span>
                                 }
-                                bodyStyle={{ padding: 0 }}
+                                styles={{ body: { padding: 0 } }}
                                 style={{
                                     maxHeight: "50vh",
                                     display: "flex",
@@ -833,7 +699,7 @@ const Dashboard = () => {
                                                     cursor: "pointer",
                                                     background:
                                                         selectedCode?.id ===
-                                                        item.id
+                                                            item.id
                                                             ? token.colorPrimaryBg
                                                             : "transparent",
                                                     borderBottom: `1px solid ${token.colorSplit}`,
@@ -948,7 +814,7 @@ const Dashboard = () => {
                                             My Posts
                                         </span>
                                     }
-                                    bodyStyle={{ padding: 0 }}
+                                    styles={{ body: { padding: 0 } }}
                                     style={{
                                         maxHeight: "50vh",
                                         display: "flex",
@@ -965,7 +831,7 @@ const Dashboard = () => {
                                                         cursor: "pointer",
                                                         background:
                                                             selectedCode?.id ===
-                                                            item.id
+                                                                item.id
                                                                 ? token.colorPrimaryBg
                                                                 : "transparent",
                                                         borderBottom: `1px solid ${token.colorSplit}`,
@@ -1021,13 +887,13 @@ const Dashboard = () => {
                                                             </Text>
                                                             {item.visibility ===
                                                                 "PRIVATE" && (
-                                                                <LockOutlined
-                                                                    style={{
-                                                                        fontSize: 10,
-                                                                        color: token.colorWarning,
-                                                                    }}
-                                                                />
-                                                            )}
+                                                                    <LockOutlined
+                                                                        style={{
+                                                                            fontSize: 10,
+                                                                            color: token.colorWarning,
+                                                                        }}
+                                                                    />
+                                                                )}
                                                         </div>
                                                         <Tag
                                                             style={{
