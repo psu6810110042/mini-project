@@ -1,11 +1,34 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Layout, Typography, Button, message, Spin, Tag, List, Avatar, Switch, Space } from "antd";
-import { CopyOutlined, UserOutlined } from "@ant-design/icons";
+import {
+    Layout,
+    Typography,
+    Button,
+    message,
+    Spin,
+    Tag,
+    List,
+    Avatar,
+    Switch,
+    Space,
+    Modal,
+    Input,
+    Select,
+    Form
+} from "antd";
+import {
+    CopyOutlined,
+    UserOutlined,
+    ArrowLeftOutlined,
+    SaveOutlined,
+    GlobalOutlined,
+    LockOutlined
+} from "@ant-design/icons";
 import { io, Socket } from "socket.io-client";
 import Editor from "@monaco-editor/react";
 import AppHeader from "../components/AppHeader";
 import type { User } from "../types";
+import { createCodeService } from "../services/codeService";
 
 const { Content } = Layout;
 const { Title } = Typography;
@@ -23,6 +46,10 @@ const LiveSessionPage: React.FC = () => {
     const [participants, setParticipants] = useState<User[]>([]);
     const [allowedUserIds, setAllowedUserIds] = useState<number[]>([]);
     const [sessionOwnerId, setSessionOwnerId] = useState<number | null>(null);
+    const [isSaved, setIsSaved] = useState(false);
+
+    const [isSaveModalVisible, setIsSaveModalVisible] = useState(false);
+    const [saveForm] = Form.useForm();
 
     const editorRef = useRef(null);
 
@@ -43,10 +70,6 @@ const LiveSessionPage: React.FC = () => {
             const allowed = isOwner || isAdmin || isGranted;
 
             setIsAllowedToEdit(allowed);
-            if (!allowed) {
-                // message.info("You are in view-only mode."); 
-                // Don't spam message on every render/update, maybe logic needs refinement
-            }
         }
     }, [currentUser, sessionOwnerId, allowedUserIds]);
 
@@ -71,11 +94,14 @@ const LiveSessionPage: React.FC = () => {
 
         newSocket.on(
             "session-details",
-            (details: { ownerId: number | null; allowedUserIds: number[]; currentCode?: string }) => {
+            (details: { ownerId: number | null; allowedUserIds: number[]; currentCode?: string; isSaved?: boolean }) => {
                 setSessionOwnerId(details.ownerId);
                 setAllowedUserIds(details.allowedUserIds || []);
                 if (details.currentCode) {
                     setCode(details.currentCode);
+                }
+                if (details.isSaved) {
+                    setIsSaved(true);
                 }
             },
         );
@@ -86,6 +112,10 @@ const LiveSessionPage: React.FC = () => {
 
         newSocket.on("permissions-update", (ids: number[]) => {
             setAllowedUserIds(ids);
+        });
+
+        newSocket.on("session-saved-update", (saved: boolean) => {
+            setIsSaved(saved);
         });
 
         newSocket.on(
@@ -110,7 +140,7 @@ const LiveSessionPage: React.FC = () => {
             newSocket.emit("leave-session", sessionId);
             newSocket.disconnect();
         };
-    }, [sessionId, navigate]); // Removed currentUser to prevent re-connections
+    }, [sessionId, navigate]);
 
     const handleEditorChange = (value: string | undefined) => {
         if (value !== undefined) {
@@ -139,6 +169,27 @@ const LiveSessionPage: React.FC = () => {
         editorRef.current = editor;
     }
 
+    const handleSaveToDashboard = async (values: any) => {
+        try {
+            await createCodeService({
+                title: values.title,
+                content: code,
+                language: "javascript",
+                visibility: values.visibility,
+                tags: values.tags || [],
+            });
+            message.success("Saved to your dashboard!");
+
+            // Mark session as saved for everyone
+            socket?.emit("mark-session-saved", sessionId);
+
+            setIsSaveModalVisible(false);
+            saveForm.resetFields();
+        } catch (error) {
+            message.error("Failed to save snippet.");
+        }
+    };
+
     const { Sider } = Layout;
 
     return (
@@ -149,6 +200,8 @@ const LiveSessionPage: React.FC = () => {
                     localStorage.clear();
                     navigate("/dashboard");
                 }}
+                showLiveButton={false}
+                showSearch={false}
             />
             <Layout>
                 <Content style={{ padding: "24px", display: 'flex', flexDirection: 'column' }}>
@@ -160,18 +213,37 @@ const LiveSessionPage: React.FC = () => {
                             marginBottom: "16px",
                         }}
                     >
-                        <Title level={3} style={{ margin: 0 }}>
-                            Live Code Session:{" "}
-                            <Typography.Text code>{sessionId}</Typography.Text>
+                        <Space>
+                            <Button
+                                icon={<ArrowLeftOutlined />}
+                                onClick={() => navigate("/dashboard")}
+                            >
+                                Back to Dashboard
+                            </Button>
+                            <Title level={4} style={{ margin: 0 }}>
+                                Session: <Typography.Text code>{sessionId}</Typography.Text>
+                            </Title>
                             {currentEditor && (
                                 <Tag color="blue" style={{ marginLeft: 8 }}>
                                     Editing: {currentEditor}
                                 </Tag>
                             )}
-                        </Title>
-                        <Button icon={<CopyOutlined />} onClick={handleCopyLink}>
-                            Copy Link
-                        </Button>
+                            {isSaved && <Tag color="success">Saved to Dashboard</Tag>}
+                        </Space>
+                        <Space>
+                            <Button icon={<CopyOutlined />} onClick={handleCopyLink}>
+                                Copy Link
+                            </Button>
+                            <Button
+                                type="primary"
+                                icon={<SaveOutlined />}
+                                onClick={() => setIsSaveModalVisible(true)}
+                                disabled={!currentUser || !isAllowedToEdit || isSaved}
+                                title={isSaved ? "Session already saved" : (!isAllowedToEdit ? "Only editors can save" : "Save to Dashboard")}
+                            >
+                                {isSaved ? "Saved" : "Save to Dashboard"}
+                            </Button>
+                        </Space>
                     </div>
 
                     <Editor
@@ -222,6 +294,49 @@ const LiveSessionPage: React.FC = () => {
                     />
                 </Sider>
             </Layout>
+
+            <Modal
+                title="Save Snippet to Dashboard"
+                open={isSaveModalVisible}
+                onCancel={() => setIsSaveModalVisible(false)}
+                footer={null}
+            >
+                <Form
+                    form={saveForm}
+                    onFinish={handleSaveToDashboard}
+                    initialValues={{ visibility: "PUBLIC", title: `Session ${sessionId}` }}
+                    layout="vertical"
+                >
+                    <Form.Item
+                        name="title"
+                        label="Title"
+                        rules={[{ required: true, message: "Please enter a title" }]}
+                    >
+                        <Input />
+                    </Form.Item>
+                    <Form.Item
+                        name="visibility"
+                        label="Visibility"
+                    >
+                        <Select>
+                            <Select.Option value="PUBLIC"><GlobalOutlined /> Public</Select.Option>
+                            <Select.Option value="PRIVATE"><LockOutlined /> Private</Select.Option>
+                        </Select>
+                    </Form.Item>
+                    <Form.Item
+                        name="tags"
+                        label="Tags"
+                        tooltip="Type and press enter to add tags"
+                    >
+                        <Select mode="tags" placeholder="Add tags..." tokenSeparators={[',']} />
+                    </Form.Item>
+                    <Form.Item>
+                        <Button type="primary" htmlType="submit" block>
+                            Save
+                        </Button>
+                    </Form.Item>
+                </Form>
+            </Modal>
         </Layout>
     );
 };

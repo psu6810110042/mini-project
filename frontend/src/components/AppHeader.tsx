@@ -41,6 +41,7 @@ interface AppHeaderProps {
     searchResults?: CodeSnippet[];
     onSelectCode?: (code: CodeSnippet) => void;
     showSearch?: boolean; // Toggle search bar visibility
+    showLiveButton?: boolean;
 }
 
 const AppHeader: React.FC<AppHeaderProps> = ({
@@ -52,6 +53,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
     searchResults = [],
     onSelectCode,
     showSearch = true,
+    showLiveButton = true,
 }) => {
     const navigate = useNavigate();
     const { token } = theme.useToken();
@@ -132,6 +134,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
                                     borderBottom: `1px solid ${token.colorBorder}`,
                                     display: "flex",
                                     justifyContent: "space-between",
+                                    alignItems: "center",
                                 }}
                             >
                                 <Text type="secondary" style={{ fontSize: 12 }}>
@@ -249,15 +252,17 @@ const AppHeader: React.FC<AppHeaderProps> = ({
 
                 {currentUser ? (
                     <Space>
-                        <Button
-                            icon={<WifiOutlined />}
-                            onClick={() => {
-                                const sessionId = nanoid(10);
-                                navigate(`/live/${sessionId}`);
-                            }}
-                        >
-                            {screens.md && "Live Session"}
-                        </Button>
+                        {showLiveButton && (
+                            <Button
+                                icon={<WifiOutlined />}
+                                onClick={() => {
+                                    const sessionId = nanoid(10);
+                                    navigate(`/live/${sessionId}`);
+                                }}
+                            >
+                                {screens.md && "Live Session"}
+                            </Button>
+                        )}
                         {currentUser.role === "ADMIN" && (
                             <Button
                                 icon={<SafetyCertificateOutlined />}

@@ -79,6 +79,9 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect {
   // Map<sessionId, currentCode>
   private readonly sessionCode = new Map<string, string>();
 
+  // Map<sessionId, boolean> - Track if a session has been saved to dashboard
+  private readonly sessionSavedStatus = new Map<string, boolean>();
+
   @SubscribeMessage('join-dashboard')
   handleJoinDashboard(client: AuthenticatedSocket): void {
     client.join('dashboard');
@@ -100,6 +103,7 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect {
       this.sessionPermissions.set(sessionId, new Set<number>()); // No extra permissions initially
       this.sessionParticipants.set(sessionId, new Map());
       this.sessionCode.set(sessionId, '// Start coding...');
+      this.sessionSavedStatus.set(sessionId, false);
       this.activeSessions.set(sessionId, {
         startTime: new Date().toISOString(),
         owner: user.username,
@@ -127,8 +131,9 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect {
     // Send current permissions for this session
     const allowedUserIds = Array.from(this.sessionPermissions.get(sessionId) || []);
     const currentCode = this.sessionCode.get(sessionId) || '';
+    const isSaved = this.sessionSavedStatus.get(sessionId) || false;
 
-    client.emit('session-details', { ownerId, allowedUserIds, currentCode });
+    client.emit('session-details', { ownerId, allowedUserIds, currentCode, isSaved });
 
     // Also broadcast permissions to everyone (in case someone rejoined)
     this.server.to(sessionId).emit('permissions-update', allowedUserIds);
@@ -194,6 +199,25 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
+  @SubscribeMessage('mark-session-saved')
+  handleMarkSessionSaved(
+    client: AuthenticatedSocket,
+    sessionId: string
+  ): void {
+    // Ideally check permissions, but basic flow assumes client logic handled it. 
+    // Double check: is user owner or allowed?
+    const ownerId = this.sessionOwners.get(sessionId);
+    const permissions = this.sessionPermissions.get(sessionId);
+    const user = client.user;
+    const isOwner = user.id === ownerId;
+    const isAllowed = permissions?.has(user.id);
+
+    if (isOwner || isAllowed) {
+      this.sessionSavedStatus.set(sessionId, true);
+      this.server.to(sessionId).emit('session-saved-update', true);
+    }
+  }
+
   @SubscribeMessage('code-update')
   handleCodeUpdate(
     client: AuthenticatedSocket,
@@ -229,6 +253,7 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.sessionPermissions.delete(sessionId);
     this.sessionParticipants.delete(sessionId);
     this.sessionCode.delete(sessionId);
+    this.sessionSavedStatus.delete(sessionId);
     this.activeSessions.delete(sessionId);
     console.log(`Session ${sessionId} has been cleaned up.`);
     this.broadcastActiveSessions();
