@@ -38,7 +38,9 @@ import {
     SafetyCertificateOutlined,
     FileTextOutlined,
     UserAddOutlined,
+    WifiOutlined,
 } from "@ant-design/icons";
+import { nanoid } from "nanoid";
 
 import {
     getCodes,
@@ -289,6 +291,11 @@ const Dashboard = () => {
             const updatedItem = updatedCodes.find((c) => c.id === id);
             if (updatedItem) setSelectedCode(updatedItem);
         }
+    };
+
+    const handleStartLiveSession = () => {
+        const sessionId = nanoid(10);
+        navigate(`/live/${sessionId}`);
     };
 
     const renderEditorOrView = () => {
@@ -704,6 +711,12 @@ const Dashboard = () => {
 
                     {currentUser ? (
                         <Space>
+                            <Button
+                                icon={<WifiOutlined />}
+                                onClick={handleStartLiveSession}
+                            >
+                                {screens.md && "Live Session"}
+                            </Button>
                             {currentUser.role === "ADMIN" && (
                                 <Button
                                     icon={<SafetyCertificateOutlined />}

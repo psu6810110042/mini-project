@@ -1,12 +1,12 @@
 services:
-    cloudflare:
-        image: cloudflare/cloudflared:latest
-        restart: unless-stopped
-        command: tunnel --url http://frontend:5173
-        environment:
-            TUNNEL_TOKEN: eyJhIjoiNjU5ZDk0NzMwZDVjMWYwN2RhMjBkN2E1MjM2NGY1NzQiLCJ0IjoiZDk4YTMzZTEtYTJjYS00NTk5LWIyODQtZTBhZmRlM2NmYTdiIiwicyI6IlpHWmtNekJrTm1JdFpEWTJOQzAwTVdZNUxXRmlaV1F0TnpSaU0yUXpZelE0Tm1GbCJ9
-        networks:
-            - nestbin-network-dev
+    # cloudflare:
+    # image: cloudflare/cloudflared:latest
+    # restart: unless-stopped
+    # command: tunnel --url http://frontend:5173
+    # environment:
+    #     TUNNEL_TOKEN: eyJhIjoiNjU5ZDk0NzMwZDVjMWYwN2RhMjBkN2E1MjM2NGY1NzQiLCJ0IjoiZDk4YTMzZTEtYTJjYS00NTk5LWIyODQtZTBhZmRlM2NmYTdiIiwicyI6IlpHWmtNekJrTm1JdFpEWTJOQzAwTVdZNUxXRmlaV1F0TnpSaU0yUXpZelE0Tm1GbCJ9
+    # networks:
+    #     - nestbin-network-dev
 
     db:
         image: postgres:15-alpine

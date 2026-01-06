@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, ReactNode } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { ConfigProvider, theme, Layout, Button } from "antd";
 import { BulbOutlined, BulbFilled } from "@ant-design/icons";
@@ -7,57 +7,88 @@ import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import Dashboard from "./pages/Dashboard";
 import AdminPanel from "./pages/AdminPanel";
+import LiveSessionPage from "./pages/LiveSessionPage";
+
+const ProtectedRoute = ({ children }: { children: ReactNode }) => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+        return <Navigate to="/login" replace />;
+    }
+    return <>{children}</>;
+};
 
 function App() {
-  const [isDarkMode, setIsDarkMode] = useState(() => {
-    const savedMode = localStorage.getItem("isDarkMode");
-    return savedMode === "true";
-  });
+    const [isDarkMode, setIsDarkMode] = useState(() => {
+        const savedMode = localStorage.getItem("isDarkMode");
+        return savedMode === "true";
+    });
 
-  const { defaultAlgorithm, darkAlgorithm } = theme;
+    const { defaultAlgorithm, darkAlgorithm } = theme;
 
-  useEffect(() => {
-    localStorage.setItem("isDarkMode", isDarkMode.toString());
+    useEffect(() => {
+        localStorage.setItem("isDarkMode", isDarkMode.toString());
 
-    if (isDarkMode) {
-      document.body.style.backgroundColor = "#000000";
-      document.body.style.color = "#ffffff";
-    } else {
-      document.body.style.backgroundColor = "#ffffff";
-      document.body.style.color = "#000000";
-    }
-  }, [isDarkMode]);
+        if (isDarkMode) {
+            document.body.style.backgroundColor = "#000000";
+            document.body.style.color = "#ffffff";
+        } else {
+            document.body.style.backgroundColor = "#ffffff";
+            document.body.style.color = "#000000";
+        }
+    }, [isDarkMode]);
 
-  return (
-    <ConfigProvider
-      theme={{
-        algorithm: isDarkMode ? darkAlgorithm : defaultAlgorithm,
-        token: {
-          colorPrimary: "#1890ff",
-        },
-      }}
-    >
-      <Layout style={{ minHeight: "100vh", background: "transparent" }}>
-        <div style={{ position: "fixed", bottom: 20, right: 20, zIndex: 1000 }}>
-          <Button
-            shape="circle"
-            icon={isDarkMode ? <BulbFilled /> : <BulbOutlined />}
-            onClick={() => setIsDarkMode(!isDarkMode)}
-            size="large"
-          />
-        </div>
+    return (
+        <ConfigProvider
+            theme={{
+                algorithm: isDarkMode ? darkAlgorithm : defaultAlgorithm,
+                token: {
+                    colorPrimary: "#1890ff",
+                },
+            }}
+        >
+            <Layout style={{ minHeight: "100vh", background: "transparent" }}>
+                <div
+                    style={{
+                        position: "fixed",
+                        bottom: 20,
+                        right: 20,
+                        zIndex: 1000,
+                    }}
+                >
+                    <Button
+                        shape="circle"
+                        icon={isDarkMode ? <BulbFilled /> : <BulbOutlined />}
+                        onClick={() => setIsDarkMode(!isDarkMode)}
+                        size="large"
+                    />
+                </div>
 
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/snippet/:id" element={<Dashboard />} />
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
-          <Route path="/admin" element={<AdminPanel />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </Layout>
-    </ConfigProvider>
-  );
+                <Routes>
+                    <Route path="/" element={<Dashboard />} />
+                    <Route path="/snippet/:id" element={<Dashboard />} />
+                    <Route path="/login" element={<LoginPage />} />
+                    <Route path="/register" element={<RegisterPage />} />
+                    <Route
+                        path="/admin"
+                        element={
+                            <ProtectedRoute>
+                                <AdminPanel />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/live/:sessionId"
+                        element={
+                            <ProtectedRoute>
+                                <LiveSessionPage />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route path="*" element={<Navigate to="/" replace />} />
+                </Routes>
+            </Layout>
+        </ConfigProvider>
+    );
 }
 
 export default App;

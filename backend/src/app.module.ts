@@ -5,6 +5,7 @@ import { UsersModule } from "./users/users.module";
 import { AuthModule } from "./auth/auth.module";
 import { SnippetsModule } from "./snippets/snippets.module";
 import { TagsModule } from "./tags/tags.module";
+import { LiveModule } from './live/live.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { TagsModule } from "./tags/tags.module";
     AuthModule,
     SnippetsModule,
     TagsModule,
+    LiveModule,
   ],
 })
 export class AppModule {}
