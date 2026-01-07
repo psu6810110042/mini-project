@@ -410,6 +410,16 @@ const Dashboard = () => {
                                         Edit
                                     </Button>
                                     <Button
+                                        type="default"
+                                        icon={<WifiOutlined />}
+                                        onClick={() => {
+                                            const sessionId = Math.random().toString(36).substring(2, 9);
+                                            navigate(`/live/${sessionId}`, { state: { snippet: selectedCode } });
+                                        }}
+                                    >
+                                        Go Live
+                                    </Button>
+                                    <Button
                                         danger
                                         icon={<DeleteOutlined />}
                                         onClick={() =>

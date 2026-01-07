@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import {
     Layout,
     Typography,
@@ -27,8 +27,8 @@ import {
 import { io, Socket } from "socket.io-client";
 import Editor from "@monaco-editor/react";
 import AppHeader from "../components/AppHeader";
-import type { User } from "../types";
-import { createCodeService } from "../services/codeService";
+import type { User, CodeSnippet } from "../types";
+import { createCodeService, updateCodeService } from "../services/codeService";
 
 const { Content } = Layout;
 const { Title } = Typography;
@@ -39,6 +39,7 @@ const LiveSessionPage: React.FC = () => {
 
     const [currentUser, setCurrentUser] = useState<User | null>(null);
     const [code, setCode] = useState<string>("// Connecting to session...");
+    const codeRef = useRef<string>(code);
     const [socket, setSocket] = useState<Socket | null>(null);
     const [isAllowedToEdit, setIsAllowedToEdit] = useState(false);
     const [currentEditor, setCurrentEditor] = useState<string | null>(null);
@@ -46,12 +47,21 @@ const LiveSessionPage: React.FC = () => {
     const [participants, setParticipants] = useState<User[]>([]);
     const [allowedUserIds, setAllowedUserIds] = useState<number[]>([]);
     const [sessionOwnerId, setSessionOwnerId] = useState<number | null>(null);
+
     const [isSaved, setIsSaved] = useState(false);
+    const [savedSnippet, setSavedSnippet] = useState<CodeSnippet | null>(null);
+
+    const location = useLocation();
 
     const [isSaveModalVisible, setIsSaveModalVisible] = useState(false);
     const [saveForm] = Form.useForm();
 
     const editorRef = useRef(null);
+
+    const updateCode = (newCode: string) => {
+        setCode(newCode);
+        codeRef.current = newCode;
+    };
 
     useEffect(() => {
         const userStr = localStorage.getItem("user");
@@ -59,6 +69,32 @@ const LiveSessionPage: React.FC = () => {
             setCurrentUser(JSON.parse(userStr));
         }
     }, []);
+
+    // Load initial code/snippet from navigation state if available (Start from Dashboard)
+    useEffect(() => {
+        if (location.state?.snippet) {
+            const snippet = location.state.snippet as CodeSnippet;
+            setSavedSnippet(snippet);
+            updateCode(snippet.content);
+            // We also need to emit this code to the session if we are the owner/creator
+            // But we might need to wait for socket connection.
+            // Actually, if we are creating the session, handleJoinSession sets default code.
+            // We should overwrite it.
+            // Let's do it in the socket connect block or here if socket is ready?
+            // Safer: Wait for socket to be ready and we are joined. 
+            // BUT: simple way: set local code, and when we join, if we are owner, we can emit update.
+        }
+    }, [location.state]);
+
+    useEffect(() => {
+        if (savedSnippet) {
+            saveForm.setFieldsValue({
+                title: savedSnippet.title,
+                visibility: savedSnippet.visibility,
+                tags: savedSnippet.tags ? savedSnippet.tags.map((t: any) => t.name) : [],
+            });
+        }
+    }, [savedSnippet, saveForm]);
 
     // Calculate permissions whenever currentUser or sessionOwnerId changes
     useEffect(() => {
@@ -90,6 +126,12 @@ const LiveSessionPage: React.FC = () => {
         newSocket.on("connect", () => {
             console.log("Connected to WebSocket server");
             newSocket.emit("join-session", sessionId);
+
+            // If we have initial code from a snippet and we are joining, 
+            // we might want to push it. relying on local state 'code' is risky if it was default.
+            // But 'code' state is updated in the useEffect above.
+            // We need to verify if we are the owner before overwriting. 
+            // We can't know if we are owner until 'session-details' or logic confirms it.
         });
 
         newSocket.on(
@@ -97,9 +139,38 @@ const LiveSessionPage: React.FC = () => {
             (details: { ownerId: number | null; allowedUserIds: number[]; currentCode?: string; isSaved?: boolean }) => {
                 setSessionOwnerId(details.ownerId);
                 setAllowedUserIds(details.allowedUserIds || []);
-                if (details.currentCode) {
-                    setCode(details.currentCode);
+
+                // If we have an initial snippet (savedSnippet) AND we are the owner,
+                // AND the server sent default code ("// Start coding..."),
+                // we should probably overwrite it with our snippet code.
+                // However, 'currentCode' from server might be meaningful if session existed.
+
+                // Logic: If 'location.state.snippet' was present, we prefer that code initially.
+                // BUT only if we are the one who started it (Owner).
+                // And only if the session seems "fresh" (e.g. currentCode is default).
+                // Or: simply if we are owner and have savedSnippet, we emit update to sync.
+
+                // Let's handle 'currentCode' update carefully.
+                // Let's handle 'currentCode' update carefully.
+                if (details.currentCode && details.currentCode !== '// Start coding...') {
+                    updateCode(details.currentCode);
+                } else if (!details.currentCode || details.currentCode === '// Start coding...') {
+                    // Server has default code.
+                    if (location.state?.snippet) {
+                        // We have snippet code in 'code' state already from useEffect.
+                        // Do NOT overwrite 'code' with default.
+                        // AND emit update to server so others see it.
+                        if (details.ownerId === currentUser?.id) { // Wait, currentUser might not be set yet? No, it is.
+                            // Actually better to check if we are the owner based on details.
+                            // But we need to use the socket we just created.
+                            // We'll trust that 'code' has the snippet content.
+                            newSocket.emit("code-update", { sessionId, code: codeRef.current });
+                        }
+                    } else if (details.currentCode) {
+                        updateCode(details.currentCode);
+                    }
                 }
+
                 if (details.isSaved) {
                     setIsSaved(true);
                 }
@@ -121,8 +192,10 @@ const LiveSessionPage: React.FC = () => {
         newSocket.on(
             "code-updated",
             (data: { code: string; editor: string }) => {
-                setCode(data.code);
-                setCurrentEditor(data.editor);
+                if (data.editor !== currentUser?.username) {
+                    updateCode(data.code);
+                    setCurrentEditor(data.editor);
+                }
             },
         );
 
@@ -144,7 +217,7 @@ const LiveSessionPage: React.FC = () => {
 
     const handleEditorChange = (value: string | undefined) => {
         if (value !== undefined) {
-            setCode(value);
+            updateCode(value);
             if (isAllowedToEdit) {
                 socket?.emit("code-update", { sessionId, code: value });
             }
@@ -171,20 +244,39 @@ const LiveSessionPage: React.FC = () => {
 
     const handleSaveToDashboard = async (values: any) => {
         try {
-            await createCodeService({
-                title: values.title,
-                content: code,
-                language: "javascript",
-                visibility: values.visibility,
-                tags: values.tags || [],
-            });
-            message.success("Saved to your dashboard!");
+            if (savedSnippet) {
+                await updateCodeService(savedSnippet.id, {
+                    title: values.title,
+                    content: code,
+                    language: "javascript",
+                    visibility: values.visibility,
+                    tags: values.tags || [],
+                });
+                message.success("Snippet updated successfully!");
+                setSavedSnippet({
+                    ...savedSnippet,
+                    title: values.title,
+                    content: code,
+                    visibility: values.visibility,
+                    tags: (values.tags || []).map((t: string) => ({ id: Math.random().toString(), name: t }))
+                } as CodeSnippet);
+            } else {
+                const newSnippet = await createCodeService({
+                    title: values.title,
+                    content: code,
+                    language: "javascript",
+                    visibility: values.visibility,
+                    tags: values.tags || [],
+                });
+                setSavedSnippet(newSnippet);
+                message.success("Saved to your dashboard!");
 
-            // Mark session as saved for everyone
-            socket?.emit("mark-session-saved", sessionId);
+                // Mark session as saved for everyone
+                socket?.emit("mark-session-saved", sessionId);
+            }
 
             setIsSaveModalVisible(false);
-            saveForm.resetFields();
+            // saveForm.resetFields(); 
         } catch (error) {
             message.error("Failed to save snippet.");
         }
@@ -238,10 +330,10 @@ const LiveSessionPage: React.FC = () => {
                                 type="primary"
                                 icon={<SaveOutlined />}
                                 onClick={() => setIsSaveModalVisible(true)}
-                                disabled={!currentUser || !isAllowedToEdit || isSaved}
-                                title={isSaved ? "Session already saved" : (!isAllowedToEdit ? "Only editors can save" : "Save to Dashboard")}
+                                disabled={!currentUser || !isAllowedToEdit}
+                                title={!isAllowedToEdit ? "Only editors can save" : (savedSnippet ? "Update Snippet" : "Save to Dashboard")}
                             >
-                                {isSaved ? "Saved" : "Save to Dashboard"}
+                                {savedSnippet ? "Update Snippet" : (isSaved ? "Save Copy" : "Save to Dashboard")}
                             </Button>
                         </Space>
                     </div>
@@ -296,7 +388,7 @@ const LiveSessionPage: React.FC = () => {
             </Layout>
 
             <Modal
-                title="Save Snippet to Dashboard"
+                title={savedSnippet ? "Update Snippet" : "Save Snippet to Dashboard"}
                 open={isSaveModalVisible}
                 onCancel={() => setIsSaveModalVisible(false)}
                 footer={null}
@@ -332,7 +424,7 @@ const LiveSessionPage: React.FC = () => {
                     </Form.Item>
                     <Form.Item>
                         <Button type="primary" htmlType="submit" block>
-                            Save
+                            {savedSnippet ? "Update" : "Save"}
                         </Button>
                     </Form.Item>
                 </Form>

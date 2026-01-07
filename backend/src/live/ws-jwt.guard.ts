@@ -9,7 +9,7 @@ export class WsJwtGuard implements CanActivate {
   constructor(
     private jwtService: JwtService,
     private configService: ConfigService,
-  ) {}
+  ) { }
 
   async canActivate(context: any): Promise<boolean> {
     const client: Socket = context.switchToWs().getClient();
@@ -24,7 +24,7 @@ export class WsJwtGuard implements CanActivate {
       const payload = await this.jwtService.verifyAsync(token, { secret });
       // Attach user to the socket object, consistent with HTTP request user
       client["user"] = {
-        id: payload.sub,
+        id: Number(payload.sub),
         username: payload.username,
         role: payload.role,
       };
