@@ -17,7 +17,7 @@ export class SnippetsService {
   constructor(
     @InjectRepository(Snippet) private snippetRepo: Repository<Snippet>,
     @InjectRepository(Tag) private tagRepo: Repository<Tag>,
-  ) {}
+  ) { }
 
   async create(createDto: CreateSnippetDto, user: User) {
     const tagEntities: Tag[] = [];
@@ -104,6 +104,43 @@ export class SnippetsService {
         "You are not authorized to edit this snippet",
       );
     }
+
+    if (updateDto.tags) {
+      const tagEntities: Tag[] = [];
+
+      for (const rawTagName of updateDto.tags) {
+        const tagName = rawTagName.toLowerCase();
+
+        let tag = await this.tagRepo.findOneBy({ name: tagName });
+
+        if (!tag) {
+          tag = this.tagRepo.create({ name: tagName });
+          await this.tagRepo.save(tag);
+        }
+
+        tagEntities.push(tag);
+      }
+
+      snippet.tags = tagEntities;
+    }
+
+    if (updateDto.title) snippet.title = updateDto.title;
+    if (updateDto.content) snippet.content = updateDto.content;
+    if (updateDto.language) snippet.language = updateDto.language;
+    if (updateDto.visibility) snippet.visibility = updateDto.visibility;
+
+    return this.snippetRepo.save(snippet);
+  }
+
+  async updateShared(id: string, updateDto: UpdateSnippetDto) {
+    // For shared updates via LiveSession, we trust the caller (Gateway) 
+    // to have verified session permissions. We don't check author ownership here.
+    const snippet = await this.snippetRepo.findOne({
+      where: { id },
+      relations: ["tags", "author"],
+    });
+
+    if (!snippet) throw new NotFoundException("Snippet not found");
 
     if (updateDto.tags) {
       const tagEntities: Tag[] = [];

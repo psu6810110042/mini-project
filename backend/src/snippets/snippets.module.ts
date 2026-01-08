@@ -9,5 +9,6 @@ import { Tag } from "../tags/entities/tag.entity";
   imports: [TypeOrmModule.forFeature([Snippet, Tag])],
   controllers: [SnippetsController],
   providers: [SnippetsService],
+  exports: [SnippetsService],
 })
-export class SnippetsModule {}
+export class SnippetsModule { }

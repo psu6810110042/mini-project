@@ -58,6 +58,8 @@ const LiveSessionPage: React.FC = () => {
 
     const editorRef = useRef(null);
 
+    const [snippetId, setSnippetId] = useState<string | null>(null);
+
     const updateCode = (newCode: string) => {
         setCode(newCode);
         codeRef.current = newCode;
@@ -76,13 +78,6 @@ const LiveSessionPage: React.FC = () => {
             const snippet = location.state.snippet as CodeSnippet;
             setSavedSnippet(snippet);
             updateCode(snippet.content);
-            // We also need to emit this code to the session if we are the owner/creator
-            // But we might need to wait for socket connection.
-            // Actually, if we are creating the session, handleJoinSession sets default code.
-            // We should overwrite it.
-            // Let's do it in the socket connect block or here if socket is ready?
-            // Safer: Wait for socket to be ready and we are joined. 
-            // BUT: simple way: set local code, and when we join, if we are owner, we can emit update.
         }
     }, [location.state]);
 
@@ -126,46 +121,32 @@ const LiveSessionPage: React.FC = () => {
         newSocket.on("connect", () => {
             console.log("Connected to WebSocket server");
             newSocket.emit("join-session", sessionId);
-
-            // If we have initial code from a snippet and we are joining, 
-            // we might want to push it. relying on local state 'code' is risky if it was default.
-            // But 'code' state is updated in the useEffect above.
-            // We need to verify if we are the owner before overwriting. 
-            // We can't know if we are owner until 'session-details' or logic confirms it.
         });
 
         newSocket.on(
             "session-details",
-            (details: { ownerId: number | null; allowedUserIds: number[]; currentCode?: string; isSaved?: boolean }) => {
+            (details: { ownerId: number | null; allowedUserIds: number[]; currentCode?: string; isSaved?: boolean; snippetId?: string }) => {
                 setSessionOwnerId(details.ownerId);
                 setAllowedUserIds(details.allowedUserIds || []);
+                if (details.snippetId) {
+                    setSnippetId(details.snippetId);
+                }
 
-                // If we have an initial snippet (savedSnippet) AND we are the owner,
-                // AND the server sent default code ("// Start coding..."),
-                // we should probably overwrite it with our snippet code.
-                // However, 'currentCode' from server might be meaningful if session existed.
-
-                // Logic: If 'location.state.snippet' was present, we prefer that code initially.
-                // BUT only if we are the one who started it (Owner).
-                // And only if the session seems "fresh" (e.g. currentCode is default).
-                // Or: simply if we are owner and have savedSnippet, we emit update to sync.
-
-                // Let's handle 'currentCode' update carefully.
-                // Let's handle 'currentCode' update carefully.
                 if (details.currentCode && details.currentCode !== '// Start coding...') {
                     updateCode(details.currentCode);
                 } else if (!details.currentCode || details.currentCode === '// Start coding...') {
                     // Server has default code.
                     if (location.state?.snippet) {
-                        // We have snippet code in 'code' state already from useEffect.
-                        // Do NOT overwrite 'code' with default.
-                        // AND emit update to server so others see it.
-                        if (details.ownerId === currentUser?.id) { // Wait, currentUser might not be set yet? No, it is.
-                            // Actually better to check if we are the owner based on details.
-                            // But we need to use the socket we just created.
-                            // We'll trust that 'code' has the snippet content.
-                            newSocket.emit("code-update", { sessionId, code: codeRef.current });
+                        // If we are owner and have a snippet, identify it to the server
+                        // We check ownerId match slightly later or assume trusted start flow
+                        // But here we can emit if we are the one who started it.
+                        // Ideally checking if (details.ownerId === currentUser.id) but currentUser might be async.
+                        // Safer to check permission or just emit. Server validates owner.
+                        if (location.state.snippet.id) {
+                            newSocket.emit("identify-snippet", { sessionId, snippetId: location.state.snippet.id });
                         }
+
+                        newSocket.emit("code-update", { sessionId, code: codeRef.current });
                     } else if (details.currentCode) {
                         updateCode(details.currentCode);
                     }
@@ -177,6 +158,12 @@ const LiveSessionPage: React.FC = () => {
             },
         );
 
+        newSocket.on("session-details-update", (data: { snippetId?: string }) => {
+            if (data.snippetId) {
+                setSnippetId(data.snippetId);
+            }
+        });
+
         newSocket.on("participants-update", (users: User[]) => {
             setParticipants(users);
         });
@@ -187,6 +174,11 @@ const LiveSessionPage: React.FC = () => {
 
         newSocket.on("session-saved-update", (saved: boolean) => {
             setIsSaved(saved);
+        });
+
+        newSocket.on("snippet-saved", (data: { updater: string; timestamp: string }) => {
+            message.success(`Snippet updated by ${data.updater}`);
+            setIsSaved(true);
         });
 
         newSocket.on(
@@ -205,7 +197,6 @@ const LiveSessionPage: React.FC = () => {
 
         newSocket.on("disconnect", () => {
             console.log("Disconnected from WebSocket server.");
-            // setCode("// Disconnected from session. Please refresh."); // Don't wipe code on momentary disconnect
             setIsAllowedToEdit(false);
         });
 
@@ -244,7 +235,24 @@ const LiveSessionPage: React.FC = () => {
 
     const handleSaveToDashboard = async (values: any) => {
         try {
-            if (savedSnippet) {
+            // Priority: Shared Snippet Update via Socket
+            if (snippetId) {
+                socket?.emit("save-snippet", {
+                    sessionId,
+                    updateDto: {
+                        title: values.title,
+                        content: code,
+                        language: "javascript",
+                        visibility: values.visibility,
+                        tags: values.tags || [],
+                    }
+                });
+                // Optimistic update or wait for 'snippet-saved' event
+                // We rely on event for confirmation to avoid double messages
+                // message.loading("Updating shared snippet..."); 
+            }
+            // Fallback: Personal Snippet Update or Create
+            else if (savedSnippet) {
                 await updateCodeService(savedSnippet.id, {
                     title: values.title,
                     content: code,
@@ -331,9 +339,9 @@ const LiveSessionPage: React.FC = () => {
                                 icon={<SaveOutlined />}
                                 onClick={() => setIsSaveModalVisible(true)}
                                 disabled={!currentUser || !isAllowedToEdit}
-                                title={!isAllowedToEdit ? "Only editors can save" : (savedSnippet ? "Update Snippet" : "Save to Dashboard")}
+                                title={!isAllowedToEdit ? "Only editors can save" : (snippetId ? "Update Shared Snippet" : (savedSnippet ? "Update Snippet" : "Save to Dashboard"))}
                             >
-                                {savedSnippet ? "Update Snippet" : (isSaved ? "Save Copy" : "Save to Dashboard")}
+                                {snippetId ? "Update Shared Snippet" : (savedSnippet ? "Update Snippet" : (isSaved ? "Save Copy" : "Save to Dashboard"))}
                             </Button>
                         </Space>
                     </div>
@@ -388,7 +396,7 @@ const LiveSessionPage: React.FC = () => {
             </Layout>
 
             <Modal
-                title={savedSnippet ? "Update Snippet" : "Save Snippet to Dashboard"}
+                title={snippetId ? "Update Shared Snippet" : (savedSnippet ? "Update Snippet" : "Save Snippet to Dashboard")}
                 open={isSaveModalVisible}
                 onCancel={() => setIsSaveModalVisible(false)}
                 footer={null}
@@ -424,7 +432,7 @@ const LiveSessionPage: React.FC = () => {
                     </Form.Item>
                     <Form.Item>
                         <Button type="primary" htmlType="submit" block>
-                            {savedSnippet ? "Update" : "Save"}
+                            {snippetId || savedSnippet ? "Update" : "Save"}
                         </Button>
                     </Form.Item>
                 </Form>

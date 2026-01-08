@@ -9,6 +9,9 @@ import { Server, Socket } from 'socket.io';
 import { UseGuards } from '@nestjs/common';
 import { WsJwtGuard } from './ws-jwt.guard';
 
+import { SnippetsService } from '../snippets/snippets.service';
+import { UpdateSnippetDto } from '../snippets/dto/update-snippet.dto';
+
 interface AuthenticatedSocket extends Socket {
   user: {
     id: number;
@@ -27,6 +30,8 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   server: Server;
 
+  constructor(private readonly snippetsService: SnippetsService) { }
+
   // Map<sessionId, ownerId>
   private readonly sessionOwners = new Map<string, number>();
 
@@ -42,7 +47,7 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect {
   // Map<sessionId, { title?: string, language?: string, startTime: string }>
   private readonly activeSessions = new Map<
     string,
-    { title?: string; language?: string; startTime: string; owner: string }
+    { title?: string; language?: string; startTime: string; owner: string, snippetId?: string }
   >();
 
   handleConnection(client: AuthenticatedSocket) {
@@ -128,12 +133,21 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     // Send session details
     const ownerId = this.sessionOwners.get(sessionId);
+
+    // Auto-grant permission to the joining user
+    const permissions = this.sessionPermissions.get(sessionId);
+    if (permissions) {
+      permissions.add(user.id);
+    }
+
     // Send current permissions for this session
     const allowedUserIds = Array.from(this.sessionPermissions.get(sessionId) || []);
     const currentCode = this.sessionCode.get(sessionId) || '';
     const isSaved = this.sessionSavedStatus.get(sessionId) || false;
+    const sessionData = this.activeSessions.get(sessionId);
+    const snippetId = sessionData?.snippetId;
 
-    client.emit('session-details', { ownerId, allowedUserIds, currentCode, isSaved });
+    client.emit('session-details', { ownerId, allowedUserIds, currentCode, isSaved, snippetId });
 
     // Also broadcast permissions to everyone (in case someone rejoined)
     this.server.to(sessionId).emit('permissions-update', allowedUserIds);
@@ -246,6 +260,70 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect {
       editor: user.username,
     };
     this.server.to(payload.sessionId).emit('code-updated', broadcastPayload);
+  }
+
+  @SubscribeMessage('identify-snippet')
+  handleIdentifySnippet(
+    client: AuthenticatedSocket,
+    payload: { sessionId: string; snippetId: string }
+  ): void {
+    const ownerId = this.sessionOwners.get(payload.sessionId);
+    if (client.user.id !== ownerId) {
+      return; // Only owner can set the snippet ID
+    }
+
+    const session = this.activeSessions.get(payload.sessionId);
+    if (session) {
+      session.snippetId = payload.snippetId;
+      this.activeSessions.set(payload.sessionId, session);
+
+      // Broadcast update so late joiners or refresher know
+      this.server.to(payload.sessionId).emit('session-details-update', { snippetId: payload.snippetId });
+    }
+  }
+
+  @SubscribeMessage('save-snippet')
+  async handleSaveSnippet(
+    client: AuthenticatedSocket,
+    payload: { sessionId: string; updateDto: UpdateSnippetDto }
+  ): Promise<void> {
+    const sessionId = payload.sessionId;
+    const ownerId = this.sessionOwners.get(sessionId);
+    const permissions = this.sessionPermissions.get(sessionId);
+    const user = client.user;
+
+    const isOwner = user.id === ownerId;
+    const isAdmin = user.role === 'ADMIN';
+    const isAllowed = permissions?.has(user.id);
+
+    if (!isOwner && !isAdmin && !isAllowed) {
+      client.emit('auth-error', 'You are not authorized to save changes.');
+      return;
+    }
+
+    // Get linked snippet ID
+    const session = this.activeSessions.get(sessionId);
+    if (!session?.snippetId) {
+      client.emit('error', 'No linked snippet found for this session.');
+      return;
+    }
+
+    try {
+      await this.snippetsService.updateShared(session.snippetId, payload.updateDto);
+
+      // Broadcast success
+      this.server.to(sessionId).emit('snippet-saved', {
+        updater: user.username,
+        timestamp: new Date().toISOString()
+      });
+
+      this.sessionSavedStatus.set(sessionId, true);
+      this.server.to(sessionId).emit('session-saved-update', true);
+
+    } catch (error) {
+      console.error('Failed to save snippet:', error);
+      client.emit('error', 'Failed to save snippet updates.');
+    }
   }
 
   private cleanupSession(sessionId: string) {
