@@ -95,7 +95,13 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   @SubscribeMessage('join-session')
-  handleJoinSession(client: AuthenticatedSocket, sessionId: string): void {
+  handleJoinSession(
+    client: AuthenticatedSocket,
+    payload: string | { sessionId: string; language?: string }
+  ): void {
+    const sessionId = typeof payload === 'string' ? payload : payload.sessionId;
+    const language = typeof payload === 'string' ? 'javascript' : (payload.language || 'javascript');
+
     client.join(sessionId);
     const user = client.user;
     console.log(
@@ -112,13 +118,12 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect {
       this.activeSessions.set(sessionId, {
         startTime: new Date().toISOString(),
         owner: user.username,
-        // Could receive title/lang from client if needed, defaulting for now
         title: `Session ${sessionId}`,
-        language: 'javascript'
+        language: language
       });
 
       console.log(
-        `User ${user.username} is now owner of session ${sessionId}`,
+        `User ${user.username} is now owner of session ${sessionId} with language ${language}`,
       );
       this.broadcastActiveSessions();
     }
@@ -134,11 +139,8 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect {
     // Send session details
     const ownerId = this.sessionOwners.get(sessionId);
 
-    // Auto-grant permission to the joining user
-    const permissions = this.sessionPermissions.get(sessionId);
-    if (permissions) {
-      permissions.add(user.id);
-    }
+    // Auto-grant permission removed. Only owner has initial permission.
+    // Owner is handled via 'ownerId' check in Guard/Business Logic.
 
     // Send current permissions for this session
     const allowedUserIds = Array.from(this.sessionPermissions.get(sessionId) || []);
@@ -147,8 +149,17 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const sessionData = this.activeSessions.get(sessionId);
     const snippetId = sessionData?.snippetId;
     const snippetTitle = sessionData?.title;
+    const currentLanguage = sessionData?.language || 'javascript';
 
-    client.emit('session-details', { ownerId, allowedUserIds, currentCode, isSaved, snippetId, snippetTitle });
+    client.emit('session-details', {
+      ownerId,
+      allowedUserIds,
+      currentCode,
+      isSaved,
+      snippetId,
+      snippetTitle,
+      language: currentLanguage
+    });
 
     // Also broadcast permissions to everyone (in case someone rejoined)
     this.server.to(sessionId).emit('permissions-update', allowedUserIds);
@@ -327,6 +338,39 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect {
     } catch (error) {
       console.error('Failed to save snippet:', error);
       client.emit('error', 'Failed to save snippet updates.');
+    }
+  }
+
+  @SubscribeMessage('language-update')
+  handleLanguageUpdate(
+    client: AuthenticatedSocket,
+    payload: { sessionId: string; language: string }
+  ): void {
+    const ownerId = this.sessionOwners.get(payload.sessionId);
+    const user = client.user;
+    const permissions = this.sessionPermissions.get(payload.sessionId);
+
+    // Authorization check: Owner or Admin or Allowed User
+    const isOwner = user.id === ownerId;
+    const isAdmin = user.role === 'ADMIN';
+    const isAllowed = permissions?.has(user.id);
+
+    if (!isOwner && !isAdmin && !isAllowed) {
+      client.emit('auth-error', 'You are not authorized to change the language.');
+      return;
+    }
+
+    // Update session state
+    const session = this.activeSessions.get(payload.sessionId);
+    if (session) {
+      session.language = payload.language;
+      this.activeSessions.set(payload.sessionId, session);
+
+      // Broadcast to session members
+      this.server.to(payload.sessionId).emit('language-update', payload.language);
+
+      // Broadcast update to dashboard so the language tag updates there too
+      this.broadcastActiveSessions();
     }
   }
 

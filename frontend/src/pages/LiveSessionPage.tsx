@@ -61,6 +61,7 @@ const LiveSessionPage: React.FC = () => {
     const editorRef = useRef(null);
 
     const [snippetId, setSnippetId] = useState<string | null>(null);
+    const [language, setLanguage] = useState<string>("javascript");
 
     // Fetch snippet details if we are working on a shared snippet
     useEffect(() => {
@@ -140,7 +141,9 @@ const LiveSessionPage: React.FC = () => {
 
         newSocket.on("connect", () => {
             console.log("Connected to WebSocket server");
-            newSocket.emit("join-session", sessionId);
+            // Prioritize snippet language if provided (starting from snippet), else explicit language (Go Live modal)
+            const language = location.state?.snippet?.language || location.state?.language;
+            newSocket.emit("join-session", { sessionId, language });
         });
 
         newSocket.on(
@@ -152,19 +155,25 @@ const LiveSessionPage: React.FC = () => {
                     setSnippetId(details.snippetId);
                 }
 
-                // If we got a title, set it immediately to avoid 'Session [id]' flash
-                if (details.snippetTitle && (!savedSnippet || savedSnippet.title !== details.snippetTitle)) {
+                // Only properly initialize savedSnippet if we actually have a snippetId (linked to DB)
+                if (details.snippetId && details.snippetTitle && (!savedSnippet || savedSnippet.title !== details.snippetTitle)) {
                     setSavedSnippet(prev => ({
                         ...(prev || {
                             id: details.snippetId!,
                             content: details.currentCode || '',
-                            language: 'javascript',
+                            language: details.language || 'javascript',
                             visibility: 'PUBLIC',
                             tags: []
                         }),
                         id: details.snippetId!,
-                        title: details.snippetTitle!
+                        title: details.snippetTitle!,
+                        // If backend sends language, update it. Otherwise keep existing or default.
+                        language: details.language || (prev?.language || 'javascript')
                     } as CodeSnippet));
+                }
+
+                if (details.language) {
+                    setLanguage(details.language);
                 }
 
                 if (details.currentCode && details.currentCode !== '// Start coding...') {
@@ -178,10 +187,14 @@ const LiveSessionPage: React.FC = () => {
                         // Ideally checking if (details.ownerId === currentUser.id) but currentUser might be async.
                         // Safer to check permission or just emit. Server validates owner.
                         if (location.state.snippet.id) {
+                            const snippetTitle = location.state.snippet.title;
+                            // Only send title if it's not empty/untitled, otherwise let backend keep default "Session [ID]"
+                            const titleToSend = (snippetTitle && snippetTitle !== "Untitled") ? snippetTitle : undefined;
+
                             newSocket.emit("identify-snippet", {
                                 sessionId,
                                 snippetId: location.state.snippet.id,
-                                title: location.state.snippet.title
+                                title: titleToSend
                             });
                         }
 
@@ -294,7 +307,7 @@ const LiveSessionPage: React.FC = () => {
                     updateDto: {
                         title: values.title,
                         content: code,
-                        language: "javascript",
+                        language: language,
                         visibility: values.visibility,
                         tags: values.tags || [],
                     }
@@ -308,7 +321,7 @@ const LiveSessionPage: React.FC = () => {
                 await updateCodeService(savedSnippet.id, {
                     title: values.title,
                     content: code,
-                    language: "javascript",
+                    language: language,
                     visibility: values.visibility,
                     tags: values.tags || [],
                     isShared: undefined // Ensure type compatibility if isShared is extra
@@ -318,6 +331,7 @@ const LiveSessionPage: React.FC = () => {
                     ...savedSnippet,
                     title: values.title,
                     content: code,
+                    language: language,
                     visibility: values.visibility,
                     tags: (values.tags || []).map((t: string) => ({ id: Math.random().toString(), name: t }))
                 } as CodeSnippet);
@@ -325,7 +339,7 @@ const LiveSessionPage: React.FC = () => {
                 const newSnippet = await createCodeService({
                     title: values.title,
                     content: code,
-                    language: "javascript",
+                    language: language,
                     visibility: values.visibility,
                     tags: values.tags || [],
                 });
@@ -384,6 +398,24 @@ const LiveSessionPage: React.FC = () => {
                             {isSaved && <Tag color="success">Saved to Dashboard</Tag>}
                         </Space>
                         <Space>
+                            <Select
+                                style={{ width: 120 }}
+                                value={language}
+                                onChange={(val) => {
+                                    // Optimistic update
+                                    setLanguage(val);
+                                    socket?.emit("language-update", { sessionId, language: val });
+                                }}
+                                disabled={!isAllowedToEdit}
+                                options={[
+                                    { value: "javascript", label: "JavaScript" },
+                                    { value: "typescript", label: "TypeScript" },
+                                    { value: "python", label: "Python" },
+                                    { value: "html", label: "HTML" },
+                                    { value: "css", label: "CSS" },
+                                    { value: "text", label: "Plain Text" },
+                                ]}
+                            />
                             <Button icon={<CopyOutlined />} onClick={handleCopyLink}>
                                 Copy Link
                             </Button>
@@ -401,7 +433,7 @@ const LiveSessionPage: React.FC = () => {
 
                     <Editor
                         height="80vh"
-                        language="javascript"
+                        language={language}
                         theme="vs-dark"
                         value={code}
                         onChange={handleEditorChange}

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
     Layout,
     Input,
@@ -11,6 +11,8 @@ import {
     Tag,
     Grid,
     theme,
+    Modal,
+    Select,
 } from "antd";
 import {
     SearchOutlined,
@@ -35,12 +37,12 @@ const { useBreakpoint } = Grid;
 interface AppHeaderProps {
     currentUser: User | null;
     onLogout: () => void;
-    onResetToCreateMode?: () => void; // Optional, might not be needed on non-dashboard pages
+    onResetToCreateMode?: () => void;
     searchQuery?: string;
     setSearchQuery?: (val: string) => void;
     searchResults?: CodeSnippet[];
     onSelectCode?: (code: CodeSnippet) => void;
-    showSearch?: boolean; // Toggle search bar visibility
+    showSearch?: boolean;
     showLiveButton?: boolean;
 }
 
@@ -59,6 +61,15 @@ const AppHeader: React.FC<AppHeaderProps> = ({
     const { token } = theme.useToken();
     const screens = useBreakpoint();
 
+    const [isGoLiveModalVisible, setIsGoLiveModalVisible] = useState(false);
+    const [selectedLanguage, setSelectedLanguage] = useState("javascript");
+
+    const handleStartLiveSession = () => {
+        const sessionId = nanoid(10);
+        navigate(`/live/${sessionId}`, { state: { language: selectedLanguage } });
+        setIsGoLiveModalVisible(false);
+    };
+
     const handleLogoClick = () => {
         if (onResetToCreateMode) {
             onResetToCreateMode();
@@ -76,7 +87,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
                 padding: `0 ${screens.md ? "24px" : "16px"}`,
                 background: token.colorBgContainer,
                 borderBottom: `1px solid ${token.colorBorder}`,
-                zIndex: 1001, // Ensure above other content
+                zIndex: 1001,
             }}
         >
             <div
@@ -186,7 +197,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
                                                     onSelectCode(item);
                                                 }
                                                 navigate(`/snippet/${item.id}`);
-                                                setSearchQuery(""); // Clear search after selection
+                                                setSearchQuery("");
                                             }}
                                         >
                                             <div
@@ -255,10 +266,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
                         {showLiveButton && (
                             <Button
                                 icon={<WifiOutlined />}
-                                onClick={() => {
-                                    const sessionId = nanoid(10);
-                                    navigate(`/live/${sessionId}`);
-                                }}
+                                onClick={() => setIsGoLiveModalVisible(true)}
                             >
                                 {screens.md && "Live Session"}
                             </Button>
@@ -306,6 +314,32 @@ const AppHeader: React.FC<AppHeaderProps> = ({
                     </Space>
                 )}
             </Space>
+
+            <Modal
+                title="Start Live Session"
+                open={isGoLiveModalVisible}
+                onCancel={() => setIsGoLiveModalVisible(false)}
+                onOk={handleStartLiveSession}
+                okText="Start Session"
+                okButtonProps={{ icon: <WifiOutlined /> }}
+            >
+                <div style={{ padding: "20px 0" }}>
+                    <Text strong>Select Language:</Text>
+                    <Select
+                        style={{ width: "100%", marginTop: "8px" }}
+                        value={selectedLanguage}
+                        onChange={setSelectedLanguage}
+                        options={[
+                            { value: "javascript", label: "JavaScript" },
+                            { value: "typescript", label: "TypeScript" },
+                            { value: "python", label: "Python" },
+                            { value: "html", label: "HTML" },
+                            { value: "css", label: "CSS" },
+                            { value: "text", label: "Plain Text" },
+                        ]}
+                    />
+                </div>
+            </Modal>
         </Header>
     );
 };
