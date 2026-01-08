@@ -144,7 +144,8 @@ const LiveSessionPage: React.FC = () => {
             // Prioritize snippet language if provided (starting from snippet), else explicit language (Go Live modal)
             const language = location.state?.snippet?.language || location.state?.language;
             const title = location.state?.snippet?.title;
-            newSocket.emit("join-session", { sessionId, language, title });
+            const visibility = location.state?.snippet?.visibility;
+            newSocket.emit("join-session", { sessionId, language, title, visibility });
         });
 
         newSocket.on(

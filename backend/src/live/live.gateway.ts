@@ -47,7 +47,7 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect {
   // Map<sessionId, { title?: string, language?: string, startTime: string }>
   private readonly activeSessions = new Map<
     string,
-    { title?: string; language?: string; startTime: string; owner: string, snippetId?: string }
+    { title?: string; language?: string; startTime: string; owner: string, snippetId?: string, visibility?: string }
   >();
 
   handleConnection(client: AuthenticatedSocket) {
@@ -97,12 +97,15 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @SubscribeMessage('join-session')
   handleJoinSession(
     client: AuthenticatedSocket,
-    payload: string | { sessionId: string; language?: string; title?: string }
+    payload: string | { sessionId: string; language?: string; title?: string; visibility?: string }
   ): void {
+    console.log('handleJoinSession payload:', payload);
     const sessionId = typeof payload === 'string' ? payload : payload.sessionId;
     const language = typeof payload === 'string' ? 'javascript' : (payload.language || 'javascript');
     // Use provided title if available, otherwise default
     const title = (typeof payload === 'object' && payload.title) ? payload.title : `Session ${sessionId}`;
+    // Use provided visibility, default to PUBLIC
+    const visibility = (typeof payload === 'object' && payload.visibility) ? payload.visibility : 'PUBLIC';
 
     client.join(sessionId);
     const user = client.user;
@@ -121,11 +124,12 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect {
         startTime: new Date().toISOString(),
         owner: user.username,
         title: title,
-        language: language
+        language: language,
+        visibility: visibility,
       });
 
       console.log(
-        `User ${user.username} is now owner of session ${sessionId} with language ${language} and title "${title}"`,
+        `User ${user.username} is now owner of session ${sessionId} with language ${language}, title "${title}", visibility "${visibility}"`,
       );
       this.broadcastActiveSessions();
     }
@@ -401,7 +405,18 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   private broadcastActiveSessions() {
-    // Broadcast to dashboard room
-    this.server.to('dashboard').emit('active-sessions-update', Array.from(this.activeSessions.entries()));
+    // Broadcast to dashboard room - Filter out PRIVATE sessions
+    const allSessions = Array.from(this.activeSessions.entries());
+    const publicSessions = allSessions.filter(([id, session]) => {
+      // If visibility exists and is PRIVATE, filter it out
+      // @ts-ignore
+      const isPrivate = (session as any).visibility === 'PRIVATE';
+      if (isPrivate) {
+        console.log(`Filtering out private session ${id} from dashboard broadcast`);
+      }
+      return !isPrivate;
+    });
+    console.log(`Broadcasting ${publicSessions.length} public sessions (out of ${allSessions.length} total)`);
+    this.server.to('dashboard').emit('active-sessions-update', publicSessions);
   }
 }
