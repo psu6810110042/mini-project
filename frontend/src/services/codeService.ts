@@ -33,6 +33,19 @@ export const getCodes = async (): Promise<CodeSnippet[]> => {
   }
 };
 
+export const getCodeById = async (id: string): Promise<CodeSnippet | null> => {
+  try {
+    const response = await axios.get(
+      `${API_URL}/api/snippets/${id}`,
+      getAuthHeaders(),
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Fetch error:", error);
+    return null;
+  }
+};
+
 export const createCodeService = async (data: {
   title: string;
   content: string;

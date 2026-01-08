@@ -146,8 +146,9 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const isSaved = this.sessionSavedStatus.get(sessionId) || false;
     const sessionData = this.activeSessions.get(sessionId);
     const snippetId = sessionData?.snippetId;
+    const snippetTitle = sessionData?.title;
 
-    client.emit('session-details', { ownerId, allowedUserIds, currentCode, isSaved, snippetId });
+    client.emit('session-details', { ownerId, allowedUserIds, currentCode, isSaved, snippetId, snippetTitle });
 
     // Also broadcast permissions to everyone (in case someone rejoined)
     this.server.to(sessionId).emit('permissions-update', allowedUserIds);
@@ -265,7 +266,7 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @SubscribeMessage('identify-snippet')
   handleIdentifySnippet(
     client: AuthenticatedSocket,
-    payload: { sessionId: string; snippetId: string }
+    payload: { sessionId: string; snippetId: string; title?: string }
   ): void {
     const ownerId = this.sessionOwners.get(payload.sessionId);
     if (client.user.id !== ownerId) {
@@ -275,10 +276,13 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const session = this.activeSessions.get(payload.sessionId);
     if (session) {
       session.snippetId = payload.snippetId;
+      if (payload.title) {
+        session.title = payload.title;
+      }
       this.activeSessions.set(payload.sessionId, session);
 
       // Broadcast update so late joiners or refresher know
-      this.server.to(payload.sessionId).emit('session-details-update', { snippetId: payload.snippetId });
+      this.server.to(payload.sessionId).emit('session-details-update', { snippetId: payload.snippetId, snippetTitle: payload.title });
     }
   }
 

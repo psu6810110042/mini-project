@@ -28,7 +28,9 @@ import { io, Socket } from "socket.io-client";
 import Editor from "@monaco-editor/react";
 import AppHeader from "../components/AppHeader";
 import type { User, CodeSnippet } from "../types";
-import { createCodeService, updateCodeService } from "../services/codeService";
+import { createCodeService, updateCodeService, getCodeById } from "../services/codeService";
+
+// ... existing imports
 
 const { Content } = Layout;
 const { Title } = Typography;
@@ -59,6 +61,24 @@ const LiveSessionPage: React.FC = () => {
     const editorRef = useRef(null);
 
     const [snippetId, setSnippetId] = useState<string | null>(null);
+
+    // Fetch snippet details if we are working on a shared snippet
+    useEffect(() => {
+        const fetchSnippet = async () => {
+            if (snippetId) {
+                // If we don't have a snippet, OR if the current one is missing detailed fields (like tags)
+                // we should fetch the full details.
+                if (!savedSnippet || !savedSnippet.tags) {
+                    const snippet = await getCodeById(snippetId);
+                    if (snippet) {
+                        setSavedSnippet(snippet);
+                    }
+                }
+            }
+        };
+        fetchSnippet();
+    }, [snippetId, savedSnippet]);
+
 
     const updateCode = (newCode: string) => {
         setCode(newCode);
@@ -125,11 +145,26 @@ const LiveSessionPage: React.FC = () => {
 
         newSocket.on(
             "session-details",
-            (details: { ownerId: number | null; allowedUserIds: number[]; currentCode?: string; isSaved?: boolean; snippetId?: string }) => {
+            (details: { ownerId: number | null; allowedUserIds: number[]; currentCode?: string; isSaved?: boolean; snippetId?: string; snippetTitle?: string }) => {
                 setSessionOwnerId(details.ownerId);
                 setAllowedUserIds(details.allowedUserIds || []);
                 if (details.snippetId) {
                     setSnippetId(details.snippetId);
+                }
+
+                // If we got a title, set it immediately to avoid 'Session [id]' flash
+                if (details.snippetTitle && (!savedSnippet || savedSnippet.title !== details.snippetTitle)) {
+                    setSavedSnippet(prev => ({
+                        ...(prev || {
+                            id: details.snippetId!,
+                            content: details.currentCode || '',
+                            language: 'javascript',
+                            visibility: 'PUBLIC',
+                            tags: []
+                        }),
+                        id: details.snippetId!,
+                        title: details.snippetTitle!
+                    } as CodeSnippet));
                 }
 
                 if (details.currentCode && details.currentCode !== '// Start coding...') {
@@ -143,7 +178,11 @@ const LiveSessionPage: React.FC = () => {
                         // Ideally checking if (details.ownerId === currentUser.id) but currentUser might be async.
                         // Safer to check permission or just emit. Server validates owner.
                         if (location.state.snippet.id) {
-                            newSocket.emit("identify-snippet", { sessionId, snippetId: location.state.snippet.id });
+                            newSocket.emit("identify-snippet", {
+                                sessionId,
+                                snippetId: location.state.snippet.id,
+                                title: location.state.snippet.title
+                            });
                         }
 
                         newSocket.emit("code-update", { sessionId, code: codeRef.current });
@@ -158,9 +197,22 @@ const LiveSessionPage: React.FC = () => {
             },
         );
 
-        newSocket.on("session-details-update", (data: { snippetId?: string }) => {
+        newSocket.on("session-details-update", (data: { snippetId?: string; snippetTitle?: string }) => {
             if (data.snippetId) {
                 setSnippetId(data.snippetId);
+            }
+            if (data.snippetTitle) {
+                setSavedSnippet(prev => ({
+                    ...(prev || {
+                        id: data.snippetId!,
+                        content: codeRef.current,
+                        language: 'javascript',
+                        visibility: 'PUBLIC',
+                        tags: []
+                    }),
+                    id: data.snippetId!,
+                    title: data.snippetTitle!
+                } as CodeSnippet));
             }
         });
 
@@ -259,6 +311,7 @@ const LiveSessionPage: React.FC = () => {
                     language: "javascript",
                     visibility: values.visibility,
                     tags: values.tags || [],
+                    isShared: undefined // Ensure type compatibility if isShared is extra
                 });
                 message.success("Snippet updated successfully!");
                 setSavedSnippet({
