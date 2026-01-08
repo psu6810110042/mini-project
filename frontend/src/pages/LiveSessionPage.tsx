@@ -406,8 +406,14 @@ const LiveSessionPage: React.FC = () => {
         </>
     );
 
+    const editorOptions = React.useMemo(() => ({
+        readOnly: !isAllowedToEdit,
+        minimap: { enabled: !!screens.md },
+        automaticLayout: true,
+    }), [isAllowedToEdit, screens.md]);
+
     return (
-        <Layout style={{ minHeight: "100vh" }}>
+        <Layout style={{ height: "100vh", display: "flex", flexDirection: "column" }}>
             <AppHeader
                 currentUser={currentUser}
                 onLogout={() => {
@@ -417,8 +423,14 @@ const LiveSessionPage: React.FC = () => {
                 showLiveButton={false}
                 showSearch={false}
             />
-            <Layout>
-                <Content style={{ padding: screens.md ? "24px" : "16px", display: 'flex', flexDirection: 'column' }}>
+            <Layout style={{ flex: 1, overflow: "hidden" }}>
+                <Content style={{
+                    padding: screens.md ? "24px" : "16px",
+                    display: 'flex',
+                    flexDirection: 'column',
+                    height: "100%",
+                    overflow: "hidden"
+                }}>
                     <div
                         style={{
                             display: "flex",
@@ -426,7 +438,8 @@ const LiveSessionPage: React.FC = () => {
                             alignItems: "center",
                             marginBottom: "16px",
                             flexWrap: "wrap",
-                            gap: "8px"
+                            gap: "8px",
+                            flexShrink: 0
                         }}
                     >
                         <Space wrap>
@@ -495,7 +508,7 @@ const LiveSessionPage: React.FC = () => {
                         </Space>
                     </div>
 
-                    <div style={{ flex: 1, minHeight: "500px", border: "1px solid #d9d9d9", borderRadius: "8px", overflow: "hidden" }}>
+                    <div style={{ flex: 1, border: "1px solid #d9d9d9", borderRadius: "8px", overflow: "hidden", minHeight: 0 }}>
                         <Editor
                             height="100%"
                             language={language}
@@ -504,7 +517,7 @@ const LiveSessionPage: React.FC = () => {
                             onChange={handleEditorChange}
                             onMount={handleEditorDidMount}
                             loading={<Spin />}
-                            options={{ readOnly: !isAllowedToEdit, minimap: { enabled: screens.md } }}
+                            options={editorOptions}
                         />
                     </div>
                 </Content>
@@ -519,6 +532,7 @@ const LiveSessionPage: React.FC = () => {
                         placement="right"
                         onClose={() => setParticipantsDrawerVisible(false)}
                         open={participantsDrawerVisible}
+                        zIndex={1002}
                     >
                         {participantsList}
                     </Drawer>

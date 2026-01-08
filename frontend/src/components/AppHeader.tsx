@@ -370,6 +370,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
                         placement="right"
                         onClose={() => setDrawerVisible(false)}
                         open={drawerVisible}
+                        zIndex={1002}
                     >
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                             {currentUser && (
