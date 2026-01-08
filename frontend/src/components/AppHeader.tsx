@@ -13,6 +13,7 @@ import {
     theme,
     Modal,
     Select,
+    Drawer,
 } from "antd";
 import {
     SearchOutlined,
@@ -25,6 +26,7 @@ import {
     CloseCircleFilled,
     CodeOutlined,
     UserAddOutlined,
+    MenuOutlined,
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import { nanoid } from "nanoid";
@@ -63,11 +65,13 @@ const AppHeader: React.FC<AppHeaderProps> = ({
 
     const [isGoLiveModalVisible, setIsGoLiveModalVisible] = useState(false);
     const [selectedLanguage, setSelectedLanguage] = useState("javascript");
+    const [drawerVisible, setDrawerVisible] = useState(false);
 
     const handleStartLiveSession = () => {
         const sessionId = nanoid(10);
         navigate(`/live/${sessionId}`, { state: { language: selectedLanguage } });
         setIsGoLiveModalVisible(false);
+        setDrawerVisible(false); // Close drawer if open
     };
 
     const handleLogoClick = () => {
@@ -76,6 +80,90 @@ const AppHeader: React.FC<AppHeaderProps> = ({
         } else {
             navigate("/");
         }
+        setDrawerVisible(false);
+    };
+
+    // Helper to render navigation items
+    const renderNavItems = (isMobile = false) => {
+        if (currentUser) {
+            return (
+                <>
+                    {showLiveButton && (
+                        <Button
+                            icon={<WifiOutlined />}
+                            onClick={() => setIsGoLiveModalVisible(true)}
+                            block={isMobile}
+                            style={isMobile ? { marginBottom: 8 } : {}}
+                        >
+                            Live Session
+                        </Button>
+                    )}
+                    {currentUser.role === "ADMIN" && (
+                        <Button
+                            icon={<SafetyCertificateOutlined />}
+                            onClick={() => {
+                                navigate("/admin");
+                                setDrawerVisible(false);
+                            }}
+                            block={isMobile}
+                            style={isMobile ? { marginBottom: 8 } : {}}
+                        >
+                            Admin
+                        </Button>
+                    )}
+
+                    {!isMobile && screens.md && (
+                        <Text>
+                            <UserOutlined /> {currentUser.username}
+                        </Text>
+                    )}
+
+                    <Button
+                        type={isMobile ? "primary" : "text"}
+                        danger={isMobile}
+                        icon={<LogoutOutlined />}
+                        onClick={() => {
+                            onLogout();
+                            setDrawerVisible(false);
+                        }}
+                        block={isMobile}
+                        style={isMobile ? { marginBottom: 8 } : {}}
+                    >
+                        Logout
+                    </Button>
+                </>
+            );
+        }
+
+        return (
+            <>
+                <Button
+                    type="default"
+                    icon={<LoginOutlined />}
+                    onClick={() => {
+                        navigate("/login");
+                        setDrawerVisible(false);
+                    }}
+                    block={isMobile}
+                    style={isMobile ? { marginBottom: 8 } : {}}
+                >
+                    Login
+                </Button>
+
+                <Button
+                    type="primary"
+                    icon={<UserAddOutlined />}
+                    onClick={() => {
+                        navigate("/register");
+                        setDrawerVisible(false);
+                    }}
+                    block={isMobile}
+                    style={isMobile ? { marginBottom: 8 } : {}}
+                >
+                    Register
+                </Button>
+            </>
+        );
     };
 
     return (
@@ -88,6 +176,9 @@ const AppHeader: React.FC<AppHeaderProps> = ({
                 background: token.colorBgContainer,
                 borderBottom: `1px solid ${token.colorBorder}`,
                 zIndex: 1001,
+                position: "sticky",
+                top: 0,
+                width: "100%",
             }}
         >
             <div
@@ -110,6 +201,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
                         flex: 1,
                         margin: `0 ${screens.md ? "40px" : "16px"}`,
                         maxWidth: "800px",
+                        display: screens.xs && !searchQuery ? "none" : "block", // Hide search on very small screens if empty or handle differently
                     }}
                 >
                     <Input
@@ -124,6 +216,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
                         allowClear
                         style={{ width: "100%" }}
                     />
+                    {/* ... Search Results Card (same as before) ... */}
                     {searchQuery && (
                         <Card
                             style={{
@@ -250,70 +343,63 @@ const AppHeader: React.FC<AppHeaderProps> = ({
 
             {!showSearch && <div style={{ flex: 1 }} />}
 
-            <Space>
-                {onResetToCreateMode && (
-                    <Button
-                        type="primary"
-                        icon={<PlusOutlined />}
-                        onClick={onResetToCreateMode}
-                    >
-                        {screens.md && "New Paste"}
-                    </Button>
-                )}
-
-                {currentUser ? (
-                    <Space>
-                        {showLiveButton && (
-                            <Button
-                                icon={<WifiOutlined />}
-                                onClick={() => setIsGoLiveModalVisible(true)}
-                            >
-                                {screens.md && "Live Session"}
-                            </Button>
-                        )}
-                        {currentUser.role === "ADMIN" && (
-                            <Button
-                                icon={<SafetyCertificateOutlined />}
-                                onClick={() => navigate("/admin")}
-                            >
-                                {screens.md && "Admin"}
-                            </Button>
-                        )}
-
-                        {screens.md && (
-                            <Text>
-                                <UserOutlined /> {currentUser.username}
-                            </Text>
-                        )}
-
-                        <Button
-                            type="text"
-                            icon={<LogoutOutlined />}
-                            onClick={onLogout}
-                        >
-                            {screens.md && "Logout"}
-                        </Button>
-                    </Space>
-                ) : (
-                    <Space>
-                        <Button
-                            type="default"
-                            icon={<LoginOutlined />}
-                            onClick={() => navigate("/login")}
-                        >
-                            {screens.sm && "Login"}
-                        </Button>
-
+            {/* Desktop Navigation */}
+            {screens.md ? (
+                <Space>
+                    {onResetToCreateMode && (
                         <Button
                             type="primary"
-                            icon={<UserAddOutlined />}
-                            onClick={() => navigate("/register")}
+                            icon={<PlusOutlined />}
+                            onClick={onResetToCreateMode}
                         >
-                            {screens.sm && "Register"}
+                            New Paste
                         </Button>
-                    </Space>
-                )}
-            </Space>
+                    )}
+                    {renderNavItems(false)}
+                </Space>
+            ) : (
+                // Mobile Navigation (Hamburger)
+                <>
+                    <Button
+                        icon={<MenuOutlined />}
+                        type="text"
+                        onClick={() => setDrawerVisible(true)}
+                    />
+                    <Drawer
+                        title="Menu"
+                        placement="right"
+                        onClose={() => setDrawerVisible(false)}
+                        open={drawerVisible}
+                    >
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                            {currentUser && (
+                                <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
+                                    <Avatar style={{ backgroundColor: token.colorPrimary, marginRight: 8 }}>
+                                        {currentUser.username[0].toUpperCase()}
+                                    </Avatar>
+                                    <Text strong>{currentUser.username}</Text>
+                                </div>
+                            )}
+
+                            {onResetToCreateMode && (
+                                <Button
+                                    type="primary"
+                                    icon={<PlusOutlined />}
+                                    onClick={() => {
+                                        onResetToCreateMode();
+                                        setDrawerVisible(false);
+                                    }}
+                                    block
+                                >
+                                    New Paste
+                                </Button>
+                            )}
+
+                            {renderNavItems(true)}
+                        </div>
+                    </Drawer>
+                </>
+            )}
 
             <Modal
                 title="Start Live Session"

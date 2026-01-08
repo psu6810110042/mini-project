@@ -14,7 +14,9 @@ import {
     Modal,
     Input,
     Select,
-    Form
+    Form,
+    Grid,
+    Drawer,
 } from "antd";
 import {
     CopyOutlined,
@@ -34,6 +36,7 @@ import { createCodeService, updateCodeService, getCodeById } from "../services/c
 
 const { Content } = Layout;
 const { Title } = Typography;
+const { useBreakpoint } = Grid;
 
 const LiveSessionPage: React.FC = () => {
     const { sessionId } = useParams<{ sessionId: string }>();
@@ -360,6 +363,48 @@ const LiveSessionPage: React.FC = () => {
     };
 
     const { Sider } = Layout;
+    const screens = useBreakpoint();
+    const [participantsDrawerVisible, setParticipantsDrawerVisible] = useState(false);
+
+    // Sidebar content (Participants list)
+    const participantsList = (
+        <>
+            <Title level={4}>Participants</Title>
+            <List
+                itemLayout="horizontal"
+                dataSource={participants}
+                renderItem={(user) => {
+                    const isOwner = user.id === sessionOwnerId;
+                    const hasPermission = allowedUserIds.includes(user.id);
+                    const canManage = currentUser?.id === sessionOwnerId && !isOwner;
+
+                    return (
+                        <List.Item
+                            actions={canManage ? [
+                                <Switch
+                                    size="small"
+                                    checked={hasPermission}
+                                    onChange={(checked) => togglePermission(user.id, checked)}
+                                />
+                            ] : []}
+                        >
+                            <List.Item.Meta
+                                avatar={<Avatar style={{ backgroundColor: '#87d068' }} icon={<UserOutlined />} />}
+                                title={
+                                    <Space>
+                                        {user.username}
+                                        {isOwner && <Tag color="gold">Owner</Tag>}
+                                        {user.id === currentUser?.id && <Tag color="blue">You</Tag>}
+                                    </Space>
+                                }
+                                description={isOwner ? "Owner" : (hasPermission ? "Can Edit" : "View Only")}
+                            />
+                        </List.Item>
+                    );
+                }}
+            />
+        </>
+    );
 
     return (
         <Layout style={{ minHeight: "100vh" }}>
@@ -373,22 +418,32 @@ const LiveSessionPage: React.FC = () => {
                 showSearch={false}
             />
             <Layout>
-                <Content style={{ padding: "24px", display: 'flex', flexDirection: 'column' }}>
+                <Content style={{ padding: screens.md ? "24px" : "16px", display: 'flex', flexDirection: 'column' }}>
                     <div
                         style={{
                             display: "flex",
                             justifyContent: "space-between",
                             alignItems: "center",
                             marginBottom: "16px",
+                            flexWrap: "wrap",
+                            gap: "8px"
                         }}
                     >
-                        <Space>
+                        <Space wrap>
                             <Button
                                 icon={<ArrowLeftOutlined />}
                                 onClick={() => navigate("/dashboard")}
                             >
-                                Back to Dashboard
+                                {screens.md ? "Back to Dashboard" : "Back"}
                             </Button>
+                            {!screens.lg && (
+                                <Button
+                                    icon={<UserOutlined />}
+                                    onClick={() => setParticipantsDrawerVisible(true)}
+                                >
+                                    {participants.length}
+                                </Button>
+                            )}
                             <Title level={4} style={{ margin: 0 }}>
                                 {savedSnippet?.title && savedSnippet.title !== `Session ${sessionId}` ? (
                                     <span>
@@ -403,14 +458,13 @@ const LiveSessionPage: React.FC = () => {
                                     Editing: {currentEditor}
                                 </Tag>
                             )}
-                            {isSaved && <Tag color="success">Saved to Dashboard</Tag>}
+                            {isSaved && <Tag color="success">Saved</Tag>}
                         </Space>
-                        <Space>
+                        <Space wrap>
                             <Select
                                 style={{ width: 120 }}
                                 value={language}
                                 onChange={(val) => {
-                                    // Optimistic update
                                     setLanguage(val);
                                     socket?.emit("language-update", { sessionId, language: val });
                                 }}
@@ -424,9 +478,11 @@ const LiveSessionPage: React.FC = () => {
                                     { value: "text", label: "Plain Text" },
                                 ]}
                             />
-                            <Button icon={<CopyOutlined />} onClick={handleCopyLink}>
-                                Copy Link
-                            </Button>
+                            {screens.md && (
+                                <Button icon={<CopyOutlined />} onClick={handleCopyLink}>
+                                    Copy Link
+                                </Button>
+                            )}
                             <Button
                                 type="primary"
                                 icon={<SaveOutlined />}
@@ -434,58 +490,39 @@ const LiveSessionPage: React.FC = () => {
                                 disabled={!currentUser || !isAllowedToEdit}
                                 title={!isAllowedToEdit ? "Only editors can save" : (snippetId ? "Update Shared Snippet" : (savedSnippet ? "Update Snippet" : "Save to Dashboard"))}
                             >
-                                {snippetId ? "Update Shared Snippet" : (savedSnippet ? "Update Snippet" : (isSaved ? "Save Copy" : "Save to Dashboard"))}
+                                {snippetId ? "Update" : (savedSnippet ? "Update" : (isSaved ? "Save Copy" : (screens.md ? "Save to Dashboard" : "Save")))}
                             </Button>
                         </Space>
                     </div>
 
-                    <Editor
-                        height="80vh"
-                        language={language}
-                        theme="vs-dark"
-                        value={code}
-                        onChange={handleEditorChange}
-                        onMount={handleEditorDidMount}
-                        loading={<Spin />}
-                        options={{ readOnly: !isAllowedToEdit }}
-                    />
+                    <div style={{ flex: 1, minHeight: "500px", border: "1px solid #d9d9d9", borderRadius: "8px", overflow: "hidden" }}>
+                        <Editor
+                            height="100%"
+                            language={language}
+                            theme="vs-dark"
+                            value={code}
+                            onChange={handleEditorChange}
+                            onMount={handleEditorDidMount}
+                            loading={<Spin />}
+                            options={{ readOnly: !isAllowedToEdit, minimap: { enabled: screens.md } }}
+                        />
+                    </div>
                 </Content>
-                <Sider width={300} theme="light" style={{ borderLeft: '1px solid #f0f0f0', padding: '16px' }}>
-                    <Title level={4}>Participants</Title>
-                    <List
-                        itemLayout="horizontal"
-                        dataSource={participants}
-                        renderItem={(user) => {
-                            const isOwner = user.id === sessionOwnerId;
-                            const hasPermission = allowedUserIds.includes(user.id);
-                            const canManage = currentUser?.id === sessionOwnerId && !isOwner;
 
-                            return (
-                                <List.Item
-                                    actions={canManage ? [
-                                        <Switch
-                                            size="small"
-                                            checked={hasPermission}
-                                            onChange={(checked) => togglePermission(user.id, checked)}
-                                        />
-                                    ] : []}
-                                >
-                                    <List.Item.Meta
-                                        avatar={<Avatar style={{ backgroundColor: '#87d068' }} icon={<UserOutlined />} />}
-                                        title={
-                                            <Space>
-                                                {user.username}
-                                                {isOwner && <Tag color="gold">Owner</Tag>}
-                                                {user.id === currentUser?.id && <Tag color="blue">You</Tag>}
-                                            </Space>
-                                        }
-                                        description={isOwner ? "Owner" : (hasPermission ? "Can Edit" : "View Only")}
-                                    />
-                                </List.Item>
-                            );
-                        }}
-                    />
-                </Sider>
+                {screens.lg ? (
+                    <Sider width={300} theme="light" style={{ borderLeft: '1px solid #f0f0f0', padding: '16px' }}>
+                        {participantsList}
+                    </Sider>
+                ) : (
+                    <Drawer
+                        title="Participants"
+                        placement="right"
+                        onClose={() => setParticipantsDrawerVisible(false)}
+                        open={participantsDrawerVisible}
+                    >
+                        {participantsList}
+                    </Drawer>
+                )}
             </Layout>
 
             <Modal
