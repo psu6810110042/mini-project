@@ -97,10 +97,12 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @SubscribeMessage('join-session')
   handleJoinSession(
     client: AuthenticatedSocket,
-    payload: string | { sessionId: string; language?: string }
+    payload: string | { sessionId: string; language?: string; title?: string }
   ): void {
     const sessionId = typeof payload === 'string' ? payload : payload.sessionId;
     const language = typeof payload === 'string' ? 'javascript' : (payload.language || 'javascript');
+    // Use provided title if available, otherwise default
+    const title = (typeof payload === 'object' && payload.title) ? payload.title : `Session ${sessionId}`;
 
     client.join(sessionId);
     const user = client.user;
@@ -118,12 +120,12 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect {
       this.activeSessions.set(sessionId, {
         startTime: new Date().toISOString(),
         owner: user.username,
-        title: `Session ${sessionId}`,
+        title: title,
         language: language
       });
 
       console.log(
-        `User ${user.username} is now owner of session ${sessionId} with language ${language}`,
+        `User ${user.username} is now owner of session ${sessionId} with language ${language} and title "${title}"`,
       );
       this.broadcastActiveSessions();
     }

@@ -143,7 +143,8 @@ const LiveSessionPage: React.FC = () => {
             console.log("Connected to WebSocket server");
             // Prioritize snippet language if provided (starting from snippet), else explicit language (Go Live modal)
             const language = location.state?.snippet?.language || location.state?.language;
-            newSocket.emit("join-session", { sessionId, language });
+            const title = location.state?.snippet?.title;
+            newSocket.emit("join-session", { sessionId, language, title });
         });
 
         newSocket.on(
@@ -388,7 +389,13 @@ const LiveSessionPage: React.FC = () => {
                                 Back to Dashboard
                             </Button>
                             <Title level={4} style={{ margin: 0 }}>
-                                Session: <Typography.Text code>{sessionId}</Typography.Text>
+                                {savedSnippet?.title && savedSnippet.title !== `Session ${sessionId}` ? (
+                                    <span>
+                                        {savedSnippet.title} <Typography.Text type="secondary" style={{ fontSize: '0.8em' }}>({sessionId})</Typography.Text>
+                                    </span>
+                                ) : (
+                                    <>Session: <Typography.Text code>{sessionId}</Typography.Text></>
+                                )}
                             </Title>
                             {currentEditor && (
                                 <Tag color="blue" style={{ marginLeft: 8 }}>
