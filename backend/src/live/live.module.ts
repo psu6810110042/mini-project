@@ -4,9 +4,10 @@ import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule } from '@nestjs/config';
 import { WsJwtGuard } from './ws-jwt.guard';
 import { SnippetsModule } from '../snippets/snippets.module';
+import { LiveSessionManager } from './live-session-manager.service';
 
 @Module({
   imports: [JwtModule.register({}), ConfigModule, SnippetsModule],
-  providers: [LiveGateway, WsJwtGuard],
+  providers: [LiveGateway, WsJwtGuard, LiveSessionManager],
 })
-export class LiveModule { }
+export class LiveModule {}

@@ -5,32 +5,33 @@ import {
   Delete,
   UseGuards,
   Request,
-} from "@nestjs/common";
-import { UsersService } from "./users.service";
-import { JwtAuthGuard } from "../auth/jwt-auth.guard";
-import { Roles } from "../auth/roles.decorator";
-import { RolesGuard } from "../auth/roles.guard";
+} from '@nestjs/common';
+import { UsersService } from './users.service';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { Roles } from '../auth/roles.decorator';
+import { RolesGuard } from '../auth/roles.guard';
+import { User, UserRole } from './entities/user.entity';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Controller("users")
+@Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @UseGuards(JwtAuthGuard)
   @Get()
-  @Roles("ADMIN")
+  @Roles(UserRole.ADMIN)
   findAll() {
     return this.usersService.findAll();
   }
 
-  @Get(":id")
-  findOne(@Param("id") id: string) {
+  @Get(':id')
+  findOne(@Param('id') id: string) {
     return this.usersService.findOne(+id);
   }
 
   @UseGuards(JwtAuthGuard)
-  @Delete(":id")
-  remove(@Param("id") id: string, @Request() req) {
+  @Delete(':id')
+  remove(@Param('id') id: string, @Request() req: { user: User }) {
     return this.usersService.remove(+id, req.user);
   }
 }

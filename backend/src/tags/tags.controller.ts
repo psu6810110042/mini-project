@@ -7,15 +7,16 @@ import {
   Param,
   Delete,
   UseGuards,
-} from "@nestjs/common";
-import { TagsService } from "./tags.service";
-import { CreateTagDto } from "./dto/create-tag.dto";
-import { UpdateTagDto } from "./dto/update-tag.dto";
-import { JwtAuthGuard } from "../auth/jwt-auth.guard";
-import { Roles } from "../auth/roles.decorator";
-import { RolesGuard } from "../auth/roles.guard";
+} from '@nestjs/common';
+import { TagsService } from './tags.service';
+import { CreateTagDto } from './dto/create-tag.dto';
+import { UpdateTagDto } from './dto/update-tag.dto';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { Roles } from '../auth/roles.decorator';
+import { RolesGuard } from '../auth/roles.guard';
+import { UserRole } from '../users/entities/user.entity';
 
-@Controller("tags")
+@Controller('tags')
 export class TagsController {
   constructor(private readonly tagsService: TagsService) {}
 
@@ -30,21 +31,21 @@ export class TagsController {
     return this.tagsService.findAll();
   }
 
-  @Get(":id")
-  findOne(@Param("id") id: string) {
+  @Get(':id')
+  findOne(@Param('id') id: string) {
     return this.tagsService.findOne(+id);
   }
 
-  @Patch(":id")
+  @Patch(':id')
   @UseGuards(JwtAuthGuard)
-  update(@Param("id") id: string, @Body() updateTagDto: UpdateTagDto) {
+  update(@Param('id') id: string, @Body() updateTagDto: UpdateTagDto) {
     return this.tagsService.update(+id, updateTagDto);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Delete(":id")
-  @Roles("ADMIN")
-  remove(@Param("id") id: string) {
+  @Delete(':id')
+  @Roles(UserRole.ADMIN)
+  remove(@Param('id') id: string) {
     return this.tagsService.remove(+id);
   }
 }

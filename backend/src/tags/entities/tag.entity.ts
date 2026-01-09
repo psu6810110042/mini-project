@@ -1,5 +1,5 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToMany } from "typeorm";
-import { Snippet } from "../../snippets/entities/snippet.entity";
+import { Entity, PrimaryGeneratedColumn, Column, ManyToMany } from 'typeorm';
+import { Snippet } from '../../snippets/entities/snippet.entity';
 
 @Entity()
 export class Tag {

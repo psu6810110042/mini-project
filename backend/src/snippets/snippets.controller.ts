@@ -8,18 +8,17 @@ import {
   Request,
   Patch,
   Delete,
-} from "@nestjs/common";
-import { SnippetsService } from "./snippets.service";
-import { CreateSnippetDto } from "./dto/create-snippet.dto";
-import { JwtAuthGuard } from "../auth/jwt-auth.guard";
-import { OptionalJwtAuthGuard } from "../auth/jwt.guard";
-import type { Request as ExpressRequest } from "express";
-import { UpdateSnippetDto } from "./dto/update-snippet.dto";
-import { User } from "../users/entities/user.entity";
+} from '@nestjs/common';
+import { SnippetsService } from './snippets.service';
+import { CreateSnippetDto } from './dto/create-snippet.dto';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../auth/jwt.guard';
+import { UpdateSnippetDto } from './dto/update-snippet.dto';
+import { User } from '../users/entities/user.entity';
 
-@Controller("snippets")
+@Controller('snippets')
 export class SnippetsController {
-  constructor(private readonly snippetsService: SnippetsService) { }
+  constructor(private readonly snippetsService: SnippetsService) {}
 
   /**
    * Create a new snippet.
@@ -29,8 +28,8 @@ export class SnippetsController {
    */
   @UseGuards(JwtAuthGuard)
   @Post()
-  create(@Request() req, @Body() createDto: CreateSnippetDto) {
-    return this.snippetsService.create(createDto, (req as any).user);
+  create(@Request() req: { user: User }, @Body() createDto: CreateSnippetDto) {
+    return this.snippetsService.create(createDto, req.user);
   }
 
   /**
@@ -40,9 +39,9 @@ export class SnippetsController {
    * @description Uses OptionalJwtAuthGuard to allow both public and authenticated access.
    */
   @UseGuards(OptionalJwtAuthGuard)
-  @Get(":id")
-  findOne(@Request() req, @Param("id") id: string) {
-    return this.snippetsService.findOne(id, (req as any).user);
+  @Get(':id')
+  findOne(@Request() req: { user?: User }, @Param('id') id: string) {
+    return this.snippetsService.findOne(id, req.user);
   }
 
   /**
@@ -50,8 +49,8 @@ export class SnippetsController {
    */
   @UseGuards(OptionalJwtAuthGuard)
   @Get()
-  findAll(@Request() req) {
-    return this.snippetsService.findAll((req as any).user);
+  findAll(@Request() req: { user?: User }) {
+    return this.snippetsService.findAll(req.user);
   }
 
   /**
@@ -59,28 +58,27 @@ export class SnippetsController {
    * @returns The updated snippet.
    */
   @UseGuards(JwtAuthGuard)
-  @Patch(":id")
+  @Patch(':id')
   update(
-    @Param("id") id: string,
+    @Param('id') id: string,
     @Body() updateDto: UpdateSnippetDto,
-    @Request() req: ExpressRequest,
+    @Request() req: { user: User },
   ) {
-    return this.snippetsService.update(id, updateDto, (req as any).user);
+    return this.snippetsService.update(id, updateDto, req.user);
   }
 
   /**
    * Delete a snippet.
    */
   @UseGuards(JwtAuthGuard)
-  @UseGuards(JwtAuthGuard)
-  @Delete(":id")
-  remove(@Param("id") id: string, @Request() req) {
-    return this.snippetsService.remove(id, (req as any).user);
+  @Delete(':id')
+  remove(@Param('id') id: string, @Request() req: { user: User }) {
+    return this.snippetsService.remove(id, req.user);
   }
 
   @UseGuards(JwtAuthGuard)
-  @Post(":id/like")
-  like(@Param("id") id: string, @Request() req) {
-    return this.snippetsService.toggleLike(id, (req as any).user);
+  @Post(':id/like')
+  like(@Param('id') id: string, @Request() req: { user: User }) {
+    return this.snippetsService.toggleLike(id, req.user);
   }
 }

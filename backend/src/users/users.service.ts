@@ -2,11 +2,11 @@ import {
   Injectable,
   ForbiddenException,
   NotFoundException,
-} from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
-import { User, UserRole } from "./entities/user.entity";
-import * as bcrypt from "bcrypt";
+} from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { User, UserRole } from './entities/user.entity';
+import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class UsersService {
@@ -16,12 +16,12 @@ export class UsersService {
   ) {}
 
   async onModuleInit() {
-    const adminUsername = "khetadmin"; // test user
+    const adminUsername = 'khetadmin'; // test user
     const adminExists = await this.findByUsername(adminUsername);
 
     if (!adminExists) {
       const salt = await bcrypt.genSalt();
-      const passwordHash = await bcrypt.hash("adminkhet123", salt);
+      const passwordHash = await bcrypt.hash('adminkhet123', salt);
 
       const admin = this.usersRepository.create({
         username: adminUsername,
@@ -60,8 +60,11 @@ export class UsersService {
     if (!userToDelete) {
       throw new NotFoundException(`User with ID ${id} not found`);
     }
-    if (currentUser.role !== "ADMIN" && currentUser.id !== userToDelete.id) {
-      throw new ForbiddenException("You cannot delete other users");
+    if (
+      currentUser.role !== UserRole.ADMIN &&
+      currentUser.id !== userToDelete.id
+    ) {
+      throw new ForbiddenException('You cannot delete other users');
     }
 
     return this.usersRepository.remove(userToDelete);

@@ -2,22 +2,23 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
-} from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
-import { Snippet } from "./entities/snippet.entity";
-import { CreateSnippetDto } from "./dto/create-snippet.dto";
-import { User } from "../users/entities/user.entity";
-import { Tag } from "../tags/entities/tag.entity";
-import { UpdateSnippetDto } from "./dto/update-snippet.dto";
-import { customAlphabet } from "nanoid";
+} from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Snippet } from './entities/snippet.entity';
+import { CreateSnippetDto } from './dto/create-snippet.dto';
+import { User, UserRole } from '../users/entities/user.entity';
+import { Tag } from '../tags/entities/tag.entity';
+import { UpdateSnippetDto } from './dto/update-snippet.dto';
+import { customAlphabet } from 'nanoid';
+import { SnippetVisibility } from './entities/snippet-visibility.enum';
 
 @Injectable()
 export class SnippetsService {
   constructor(
     @InjectRepository(Snippet) private snippetRepo: Repository<Snippet>,
     @InjectRepository(Tag) private tagRepo: Repository<Tag>,
-  ) { }
+  ) {}
 
   async create(createDto: CreateSnippetDto, user: User) {
     const tagEntities: Tag[] = [];
@@ -33,7 +34,7 @@ export class SnippetsService {
     }
 
     const generateId = customAlphabet(
-      "123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz",
+      '123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz',
       6,
     );
 
@@ -54,19 +55,19 @@ export class SnippetsService {
   async findOne(id: string, user?: User) {
     const snippet = await this.snippetRepo.findOne({
       where: { id },
-      relations: ["tags", "author"],
+      relations: ['tags', 'author'],
     });
 
-    if (!snippet) throw new NotFoundException("Snippet not found");
+    if (!snippet) throw new NotFoundException('Snippet not found');
 
-    if (snippet.visibility === "PRIVATE") {
-      if (!user) throw new ForbiddenException("Private snippet");
+    if (snippet.visibility === SnippetVisibility.PRIVATE) {
+      if (!user) throw new ForbiddenException('Private snippet');
 
       const isAuthor = user.id === snippet.authorId;
-      const isAdmin = user.role === "ADMIN";
+      const isAdmin = user.role === UserRole.ADMIN;
 
       if (!isAuthor && !isAdmin) {
-        throw new ForbiddenException("You do not have permission to view this");
+        throw new ForbiddenException('You do not have permission to view this');
       }
     }
 
@@ -74,34 +75,37 @@ export class SnippetsService {
   }
 
   async findAll(user?: User): Promise<Snippet[]> {
-    if (user && user.role === "ADMIN") {
+    if (user && user.role === UserRole.ADMIN) {
       return this.snippetRepo.find({
-        relations: ["tags", "author", "likes"],
-        order: { createdAt: "DESC" },
+        relations: ['tags', 'author', 'likes'],
+        order: { createdAt: 'DESC' },
       });
     }
 
     if (user) {
       return this.snippetRepo.find({
-        where: [{ visibility: "PUBLIC" }, { author: { id: user.id } }],
-        relations: ["tags", "author", "likes"],
-        order: { createdAt: "DESC" },
+        where: [
+          { visibility: SnippetVisibility.PUBLIC },
+          { author: { id: user.id } },
+        ],
+        relations: ['tags', 'author', 'likes'],
+        order: { createdAt: 'DESC' },
       });
     }
 
     return this.snippetRepo.find({
-      where: { visibility: "PUBLIC" },
-      relations: ["tags", "author", "likes"],
-      order: { createdAt: "DESC" },
+      where: { visibility: SnippetVisibility.PUBLIC },
+      relations: ['tags', 'author', 'likes'],
+      order: { createdAt: 'DESC' },
     });
   }
 
   async update(id: string, updateDto: UpdateSnippetDto, user: User) {
     const snippet = await this.findOne(id, user);
 
-    if (user.role !== "ADMIN" && snippet.authorId !== user.id) {
+    if (user.role !== UserRole.ADMIN && snippet.authorId !== user.id) {
       throw new ForbiddenException(
-        "You are not authorized to edit this snippet",
+        'You are not authorized to edit this snippet',
       );
     }
 
@@ -133,14 +137,14 @@ export class SnippetsService {
   }
 
   async updateShared(id: string, updateDto: UpdateSnippetDto) {
-    // For shared updates via LiveSession, we trust the caller (Gateway) 
+    // For shared updates via LiveSession, we trust the caller (Gateway)
     // to have verified session permissions. We don't check author ownership here.
     const snippet = await this.snippetRepo.findOne({
       where: { id },
-      relations: ["tags", "author"],
+      relations: ['tags', 'author'],
     });
 
-    if (!snippet) throw new NotFoundException("Snippet not found");
+    if (!snippet) throw new NotFoundException('Snippet not found');
 
     if (updateDto.tags) {
       const tagEntities: Tag[] = [];
@@ -172,9 +176,9 @@ export class SnippetsService {
   async remove(id: string, user: User) {
     const snippet = await this.findOne(id, user);
 
-    if (user.role !== "ADMIN" && snippet.author.id !== user.id) {
+    if (user.role !== UserRole.ADMIN && snippet.author.id !== user.id) {
       throw new ForbiddenException(
-        "You are not allowed to delete this snippet",
+        'You are not allowed to delete this snippet',
       );
     }
 
@@ -184,10 +188,10 @@ export class SnippetsService {
   async toggleLike(id: string, user: User) {
     const snippet = await this.snippetRepo.findOne({
       where: { id },
-      relations: ["likes"],
+      relations: ['likes'],
     });
 
-    if (!snippet) throw new NotFoundException("Snippet not found");
+    if (!snippet) throw new NotFoundException('Snippet not found');
 
     const index = snippet.likes.findIndex((u) => u.id === user.id);
 

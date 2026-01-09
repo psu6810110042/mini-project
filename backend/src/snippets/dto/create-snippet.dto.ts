@@ -3,9 +3,9 @@ import {
   IsString,
   IsEnum,
   IsArray,
-  IsOptional,
   MaxLength,
-} from "class-validator";
+} from 'class-validator';
+import { SnippetVisibility } from '../entities/snippet-visibility.enum';
 
 export class CreateSnippetDto {
   @IsString()
@@ -21,8 +21,8 @@ export class CreateSnippetDto {
   @IsNotEmpty()
   language: string;
 
-  @IsEnum(["PUBLIC", "PRIVATE"])
-  visibility: "PUBLIC" | "PRIVATE";
+  @IsEnum(SnippetVisibility)
+  visibility: SnippetVisibility;
 
   @IsArray()
   @IsString({ each: true })
