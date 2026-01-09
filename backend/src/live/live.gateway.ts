@@ -26,6 +26,13 @@ interface AuthenticatedSocket extends Socket {
     origin: '*', // For development, allow all origins. In production, restrict this.
   },
 })
+/**
+ * LiveGateway: The WebSocket server handling real-time collaboration.
+ * 
+ * @description
+ * Manages WebSocket connections, session rooms, code synchronization, and permissions.
+ * Acts as the "Hub" for all live coding events.
+ */
 export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   server: Server;
@@ -50,12 +57,23 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect {
     { title?: string; language?: string; startTime: string; owner: string, snippetId?: string, visibility?: string }
   >();
 
+  /**
+   * Called when a new client connects.
+   * Note: The JWT Guard validates the token *during* the handshake, but `client.user` might not be fully populated here depending on Guard implementation details.
+   */
   handleConnection(client: AuthenticatedSocket) {
     // The WsJwtGuard does not run on the initial connection, so `client.user` is not available here.
     // The guard will protect all subsequent message handlers.
     console.log(`Client connected: ${client.id}`);
   }
 
+  /**
+   * Called when a client disconnects.
+   * 
+   * @description
+   * Cleans up the user from any participant lists they were part of.
+   * If a session becomes empty, it triggers `cleanupSession` to free memory.
+   */
   async handleDisconnect(client: AuthenticatedSocket) {
     console.log(`Client disconnected: ${client.id}`);
 
@@ -94,6 +112,18 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect {
     client.emit('active-sessions-update', Array.from(this.activeSessions.entries()));
   }
 
+  /**
+   * Handles 'join-session' event.
+   * 
+   * @param client The socket client.
+   * @param payload Contains sessionId and optional metadata (language, title).
+   * 
+   * @description
+   * 1. Adds the client to the socketio room.
+   * 2. If it's a new session, initializes state (owner, permissions, etc.).
+   * 3. Sends back `session-details` specifically to the joiner.
+   * 4. Broadcasts `participants-update` to existing members.
+   */
   @SubscribeMessage('join-session')
   handleJoinSession(
     client: AuthenticatedSocket,
@@ -250,6 +280,15 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
+  /**
+   * Handles the 'code-update' event.
+   * 
+   * @param payload Contains the new code and sessionId.
+   * @description
+   * 1. Checks if the sender has permission (Owner OR Admin OR Granted).
+   * 2. Updates the server-side code state.
+   * 3. Broadcasts 'code-updated' to all OTHER clients in the room (to prevent loop).
+   */
   @SubscribeMessage('code-update')
   handleCodeUpdate(
     client: AuthenticatedSocket,
@@ -303,6 +342,14 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
+  /**
+   * Handles 'save-snippet' event to update an existing shared snippet.
+   * 
+   * @param payload Contains update details (DTO) and sessionId.
+   * @description
+   * Calls the `snippetsService` to perform a database update.
+   * If successful, broadcasts 'snippet-saved' to notify everyone.
+   */
   @SubscribeMessage('save-snippet')
   async handleSaveSnippet(
     client: AuthenticatedSocket,

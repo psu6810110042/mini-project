@@ -84,6 +84,16 @@ const LiveSessionPage: React.FC = () => {
     }, [snippetId, savedSnippet]);
 
 
+    /**
+     * Updates the local code state and the ref simultaneously.
+     * 
+     * @param {string} newCode - The new code string to update.
+     * @returns {void}
+     * @description
+     * This helper function ensures that both the React state (`code`) used for rendering
+     * and the `useRef` (`codeRef`) used for accessing the latest value inside callbacks
+     * are synchronized. This is critical for preventing stale closures in socket events.
+     */
     const updateCode = (newCode: string) => {
         setCode(newCode);
         codeRef.current = newCode;
@@ -115,7 +125,19 @@ const LiveSessionPage: React.FC = () => {
         }
     }, [savedSnippet, saveForm]);
 
-    // Calculate permissions whenever currentUser or sessionOwnerId changes
+    /**
+     * Logic for calculating editing permissions.
+     * 
+     * @dependencies currentUser, sessionOwnerId, allowedUserIds
+     * @description
+     * Determines whether the current user is allowed to edit the code.
+     * A user can edit if:
+     * 1. They are the Owner of the session.
+     * 2. They have an ADMIN role.
+     * 3. Their ID is in the `allowedUserIds` list (granted by owner).
+     * 
+     * The result updates `isAllowedToEdit` state, which toggles the `readOnly` prop of the Editor.
+     */
     useEffect(() => {
         if (currentUser && sessionOwnerId !== null) {
             const isOwner = currentUser.id === sessionOwnerId;
@@ -128,6 +150,17 @@ const LiveSessionPage: React.FC = () => {
         }
     }, [currentUser, sessionOwnerId, allowedUserIds]);
 
+    /**
+     * Main WebSocket Connection Setup.
+     * 
+     * @description
+     * Establish the socket connection when the page loads.
+     * It handles:
+     * - Connecting with Auth Token.
+     * - Emitting 'join-session' event.
+     * - Listening for real-time updates: 'session-details', 'code-updated', 'participants-update', etc.
+     * - cleaning up (disconnecting) when leaving the page.
+     */
     useEffect(() => {
         const token = localStorage.getItem("token");
         if (!token) {
@@ -254,6 +287,7 @@ const LiveSessionPage: React.FC = () => {
         newSocket.on(
             "code-updated",
             (data: { code: string; editor: string }) => {
+                // IMPORTANT: Only update if it's NOT our own edit to avoid loops/cursor jumping
                 if (data.editor !== currentUser?.username) {
                     updateCode(data.code);
                     setCurrentEditor(data.editor);
@@ -276,6 +310,17 @@ const LiveSessionPage: React.FC = () => {
         };
     }, [sessionId, navigate]);
 
+    /**
+     * Handles changes in the code editor.
+     * 
+     * @param {string | undefined} value - The new code content from the editor.
+     * @returns {void}
+     * @description
+     * Called whenever the user types in the Monaco Editor.
+     * 1. Updates local state immediately for responsiveness.
+     * 2. If the user has permission (`isAllowedToEdit`), emits 'code-update' to the server
+     *    to broadcast changes to other users.
+     */
     const handleEditorChange = (value: string | undefined) => {
         if (value !== undefined) {
             updateCode(value);
@@ -285,11 +330,22 @@ const LiveSessionPage: React.FC = () => {
         }
     };
 
+    /**
+     * Copies the current session URL to the clipboard.
+     */
     const handleCopyLink = () => {
         navigator.clipboard.writeText(window.location.href);
         message.success("Session link copied to clipboard!");
     };
 
+    /**
+     * Toggles edit permission for a specific user.
+     * 
+     * @param {number} userId - The ID of the user to update.
+     * @param {boolean} grant - True to grant permission, False to revoke.
+     * @description
+     * Only the session owner can call this. Emits 'grant-permission' or 'revoke-permission' events.
+     */
     const togglePermission = (userId: number, grant: boolean) => {
         if (!socket) return;
         if (grant) {
@@ -303,6 +359,15 @@ const LiveSessionPage: React.FC = () => {
         editorRef.current = editor;
     }
 
+    /**
+     * Saves the current session code to the user's dashboard.
+     * 
+     * @param {any} values - Form values including title, visibility, and tags.
+     * @description
+     * Handles two scenarios:
+     * 1. **Shared Snippet (`snippetId` exists):** Emits 'save-snippet' via socket to update the existing snippet in the DB and notify others.
+     * 2. **New/Personal Save:** Calls REST API (`createCodeService` or `updateCodeService`) to save to the current user's personal dashboard.
+     */
     const handleSaveToDashboard = async (values: any) => {
         try {
             // Priority: Shared Snippet Update via Socket
@@ -329,7 +394,6 @@ const LiveSessionPage: React.FC = () => {
                     language: language,
                     visibility: values.visibility,
                     tags: values.tags || [],
-                    isShared: undefined // Ensure type compatibility if isShared is extra
                 });
                 message.success("Snippet updated successfully!");
                 setSavedSnippet({
@@ -338,7 +402,7 @@ const LiveSessionPage: React.FC = () => {
                     content: code,
                     language: language,
                     visibility: values.visibility,
-                    tags: (values.tags || []).map((t: string) => ({ id: Math.random().toString(), name: t }))
+                    tags: (values.tags || []).map((t: string) => ({ id: Math.floor(Math.random() * 100000), name: t }))
                 } as CodeSnippet);
             } else {
                 const newSnippet = await createCodeService({
