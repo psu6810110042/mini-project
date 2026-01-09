@@ -13,6 +13,7 @@ import {
     Col,
     theme,
     Grid,
+    type Breakpoint,
 } from "antd";
 import {
     DeleteOutlined,
@@ -118,7 +119,7 @@ const AdminPanel = () => {
     };
 
     const userColumns = [
-        { title: "ID", dataIndex: "id", width: 80, responsive: ["md"] },
+        { title: "ID", dataIndex: "id", width: 80, responsive: ["md"] as Breakpoint[] },
         {
             title: "Username",
             dataIndex: "username",
@@ -127,7 +128,7 @@ const AdminPanel = () => {
         {
             title: "Role",
             dataIndex: "role",
-            responsive: ["sm"],
+            responsive: ["sm"] as Breakpoint[],
             render: (role: string) => (
                 <AntTag color={role === "ADMIN" ? "red" : "blue"}>
                     {role}
@@ -153,14 +154,14 @@ const AdminPanel = () => {
         {
             title: "Author",
             dataIndex: ["author", "username"],
-            responsive: ["md"],
+            responsive: ["md"] as Breakpoint[],
             render: (t: string) => <AntTag>{t}</AntTag>,
         },
-        { title: "Lang", dataIndex: "language", responsive: ["sm"] },
+        { title: "Lang", dataIndex: "language", responsive: ["sm"] as Breakpoint[] },
         {
             title: "Visibility",
             dataIndex: "visibility",
-            responsive: ["lg"],
+            responsive: ["lg"] as Breakpoint[],
             render: (v: string) => (
                 <AntTag color={v === "PRIVATE" ? "gold" : "green"}>{v}</AntTag>
             ),
@@ -180,7 +181,7 @@ const AdminPanel = () => {
     ];
 
     const tagColumns = [
-        { title: "ID", dataIndex: "id", width: 80, responsive: ["sm"] },
+        { title: "ID", dataIndex: "id", width: 80, responsive: ["sm"] as Breakpoint[] },
         {
             title: "Name",
             dataIndex: "name",

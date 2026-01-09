@@ -1,4 +1,4 @@
-import { useState, useEffect, ReactNode } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { ConfigProvider, theme, Layout, Button } from "antd";
 import { BulbOutlined, BulbFilled } from "@ant-design/icons";

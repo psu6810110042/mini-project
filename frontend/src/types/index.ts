@@ -44,3 +44,13 @@ export interface RegisterFieldValues {
   username: string;
   password: string;
 }
+
+export interface ActiveSession {
+  title?: string;
+  language?: string;
+  startTime: string;
+  owner: string; // username
+  ownerId: number;
+  snippetId?: string;
+  visibility?: "PUBLIC" | "PRIVATE";
+}

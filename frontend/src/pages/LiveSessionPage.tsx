@@ -27,7 +27,7 @@ import {
     LockOutlined
 } from "@ant-design/icons";
 import { io, Socket } from "socket.io-client";
-import Editor from "@monaco-editor/react";
+import Editor, { type OnMount } from "@monaco-editor/react";
 import AppHeader from "../components/AppHeader";
 import type { User, CodeSnippet } from "../types";
 import { createCodeService, updateCodeService, getCodeById } from "../services/codeService";
@@ -61,7 +61,7 @@ const LiveSessionPage: React.FC = () => {
     const [isSaveModalVisible, setIsSaveModalVisible] = useState(false);
     const [saveForm] = Form.useForm();
 
-    const editorRef = useRef(null);
+    const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
 
     const [snippetId, setSnippetId] = useState<string | null>(null);
     const [language, setLanguage] = useState<string>("javascript");
@@ -120,7 +120,7 @@ const LiveSessionPage: React.FC = () => {
             saveForm.setFieldsValue({
                 title: savedSnippet.title,
                 visibility: savedSnippet.visibility,
-                tags: savedSnippet.tags ? savedSnippet.tags.map((t: any) => t.name) : [],
+                tags: savedSnippet.tags ? savedSnippet.tags.map((t: import("../types").Tag) => t.name) : [],
             });
         }
     }, [savedSnippet, saveForm]);
@@ -186,7 +186,7 @@ const LiveSessionPage: React.FC = () => {
 
         newSocket.on(
             "session-details",
-            (details: { ownerId: number | null; allowedUserIds: number[]; currentCode?: string; isSaved?: boolean; snippetId?: string; snippetTitle?: string }) => {
+            (details: { ownerId: number | null; allowedUserIds: number[]; currentCode?: string; isSaved?: boolean; snippetId?: string; snippetTitle?: string; language?: string }) => {
                 setSessionOwnerId(details.ownerId);
                 setAllowedUserIds(details.allowedUserIds || []);
                 if (details.snippetId) {
@@ -355,7 +355,7 @@ const LiveSessionPage: React.FC = () => {
         }
     };
 
-    function handleEditorDidMount(editor: any) {
+    const handleEditorDidMount: OnMount = (editor) => {
         editorRef.current = editor;
     }
 
@@ -368,7 +368,13 @@ const LiveSessionPage: React.FC = () => {
      * 1. **Shared Snippet (`snippetId` exists):** Emits 'save-snippet' via socket to update the existing snippet in the DB and notify others.
      * 2. **New/Personal Save:** Calls REST API (`createCodeService` or `updateCodeService`) to save to the current user's personal dashboard.
      */
-    const handleSaveToDashboard = async (values: any) => {
+    interface SnippetFormValues {
+        title: string;
+        visibility: "PUBLIC" | "PRIVATE";
+        tags: string[];
+    }
+
+    const handleSaveToDashboard = async (values: SnippetFormValues) => {
         try {
             // Priority: Shared Snippet Update via Socket
             if (snippetId) {

@@ -16,7 +16,6 @@ import {
     Alert,
     Divider,
     Avatar,
-    Empty,
     theme,
     Grid,
 } from "antd";
@@ -43,7 +42,7 @@ import {
     deleteCodeService,
     updateCodeService,
 } from "../services/codeService";
-import type { CodeSnippet, User } from "../types";
+import type { CodeSnippet, User, ActiveSession } from "../types";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import {
     vscDarkPlus,
@@ -79,8 +78,8 @@ const Dashboard = () => {
     const [selectedCode, setSelectedCode] = useState<CodeSnippet | null>(null);
     const [isEditing, setIsEditing] = useState(false);
 
-    const [activeSessions, setActiveSessions] = useState<any[]>([]);
-    const [socket, setSocket] = useState<Socket | null>(null);
+    const [activeSessions, setActiveSessions] = useState<[string, ActiveSession][]>([]);
+    const [, setSocket] = useState<Socket | null>(null);
 
     useEffect(() => {
         const storedUserStr = localStorage.getItem("user");
@@ -112,7 +111,7 @@ const Dashboard = () => {
             newSocket.emit("join-dashboard");
         });
 
-        newSocket.on("active-sessions-update", (sessions: any[]) => {
+        newSocket.on("active-sessions-update", (sessions: [string, ActiveSession][]) => {
             // sessions is an array of [id, metadata] entries
             setActiveSessions(sessions);
         });
