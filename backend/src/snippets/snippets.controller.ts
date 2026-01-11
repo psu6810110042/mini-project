@@ -16,9 +16,11 @@ import { OptionalJwtAuthGuard } from '../auth/jwt.guard';
 import { UpdateSnippetDto } from './dto/update-snippet.dto';
 import { User } from '../users/entities/user.entity';
 
+// [REST API RECEPTIONIST]
+// This file waits for HTTP requests (GET, POST, etc.) and sends them to the right service.
 @Controller('snippets')
 export class SnippetsController {
-  constructor(private readonly snippetsService: SnippetsService) {}
+  constructor(private readonly snippetsService: SnippetsService) { }
 
   /**
    * Create a new snippet.
@@ -26,6 +28,7 @@ export class SnippetsController {
    * @param createDto - Data for creating a snippet (title, content, public/private).
    * @returns The created snippet object.
    */
+  // [POST] Create a new snippet -> /snippets
   @UseGuards(JwtAuthGuard)
   @Post()
   create(@Request() req: { user: User }, @Body() createDto: CreateSnippetDto) {
@@ -38,6 +41,7 @@ export class SnippetsController {
    * @param id - The snippet ID.
    * @description Uses OptionalJwtAuthGuard to allow both public and authenticated access.
    */
+  // [GET] Read a specific snippet -> /snippets/:id
   @UseGuards(OptionalJwtAuthGuard)
   @Get(':id')
   findOne(@Request() req: { user?: User }, @Param('id') id: string) {

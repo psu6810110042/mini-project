@@ -21,10 +21,12 @@ import type { AuthenticatedSocket } from './types/authenticated-socket.interface
 import { SnippetVisibility } from '../snippets/entities/snippet-visibility.enum';
 import { LiveSessionManager } from './live-session-manager.service';
 
+// [WEBSOCKET SERVER] This is the "Hub" or "Center" of real-time communication.
+// Unlike HTTP (which handles 1 request at a time), this keeps connections open.
 @UseGuards(WsJwtGuard)
 @WebSocketGateway({
   cors: {
-    origin: '*', // For development, allow all origins. In production, restrict this.
+    origin: '*', // Allow connections from anywhere (for development)
   },
 })
 export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect {
@@ -34,7 +36,7 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect {
   constructor(
     private readonly snippetsService: SnippetsService,
     private readonly sessionManager: LiveSessionManager,
-  ) {}
+  ) { }
 
   handleConnection(client: AuthenticatedSocket) {
     console.log(`Client connected: ${client.id}`);
@@ -66,6 +68,7 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect {
     );
   }
 
+  // [ACTION: JOIN] When a user says "I want to join this session"
   @SubscribeMessage('join-session')
   handleJoinSession(
     client: AuthenticatedSocket,
@@ -96,12 +99,18 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect {
       this.broadcastActiveSessions();
     }
 
+    // 1. Put the user in a "Room" (like a private chat group)
     client.join(sessionId);
     this.sessionManager.joinSession(sessionId, client.id, user);
+
+    // 2. [BROADCAST] Tell everyone in the room: "Hey, a new person joined!"
     this.broadcastParticipants(sessionId);
 
+    // 3. Send the current session details ONLY to the new person
     const sessionDetails = this.sessionManager.getSessionDetails(sessionId);
     client.emit('session-details', sessionDetails);
+
+    // 4. Update permissions for everyone
     this.server
       .to(sessionId)
       .emit('permissions-update', sessionDetails.allowedUserIds);
@@ -173,6 +182,7 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
+  // [ACTION: CODE UPDATE] When a user types code
   @SubscribeMessage('code-update')
   handleCodeUpdate(client: AuthenticatedSocket, payload: CodeUpdateDto): void {
     if (!this.sessionManager.isAuthorized(payload.sessionId, client.user)) {
@@ -180,12 +190,16 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect {
       return;
     }
 
+    // 1. Update the code in our memory (Server State)
     this.sessionManager.updateCode(payload.sessionId, payload.code);
 
     const broadcastPayload = {
       code: payload.code,
       editor: client.user.username,
     };
+
+    // 2. [BROADCAST] Tell everyone else in this room: "Here is the new code!"
+    // .to(sessionId) -> sends to everyone in this room
     this.server.to(payload.sessionId).emit('code-updated', broadcastPayload);
   }
 

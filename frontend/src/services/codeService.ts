@@ -20,8 +20,12 @@ export interface UpdateSnippetDto {
   tags?: string[];
 }
 
+// [HTTP MESSENGER]
+// These functions send "Letters" (HTTP Requests) to the backend.
+
 export const getCodes = async (): Promise<CodeSnippet[]> => {
   try {
+    // [GET Request] Ask server for the list of snippets
     const response = await axios.get(
       `${API_URL}/api/snippets`,
       getAuthHeaders(),
@@ -53,6 +57,7 @@ export const createCodeService = async (data: {
   visibility: "PUBLIC" | "PRIVATE";
   tags: string[];
 }) => {
+  // [POST Request] Send data to create a new snippet
   const response = await axios.post(
     `${API_URL}/api/snippets`,
     data,

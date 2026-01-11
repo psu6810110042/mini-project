@@ -161,6 +161,11 @@ const LiveSessionPage: React.FC = () => {
      * - Listening for real-time updates: 'session-details', 'code-updated', 'participants-update', etc.
      * - cleaning up (disconnecting) when leaving the page.
      */
+    /**
+     * [WEBSOCKET CONNECTION]
+     * This useEffect runs once when the page opens.
+     * It connects the "phone line" to the server.
+     */
     useEffect(() => {
         const token = localStorage.getItem("token");
         if (!token) {
@@ -169,12 +174,14 @@ const LiveSessionPage: React.FC = () => {
             return;
         }
 
+        // 1. Dial the number (Connect to Server)
         const newSocket = io({
             transports: ["websocket"],
-            auth: { token },
+            auth: { token }, // Show our ID card (Token)
         });
         setSocket(newSocket);
 
+        // 2. When connected: "Hello, I want to join this room!"
         newSocket.on("connect", () => {
             console.log("Connected to WebSocket server");
             // Prioritize snippet language if provided (starting from snippet), else explicit language (Go Live modal)
@@ -284,6 +291,7 @@ const LiveSessionPage: React.FC = () => {
             setIsSaved(true);
         });
 
+        // [LISTENER] When server says "Here is the new code from someone else"
         newSocket.on(
             "code-updated",
             (data: { code: string; editor: string }) => {
@@ -321,10 +329,14 @@ const LiveSessionPage: React.FC = () => {
      * 2. If the user has permission (`isAllowedToEdit`), emits 'code-update' to the server
      *    to broadcast changes to other users.
      */
+    /**
+     * [ACTION] When YOU type in the editor
+     */
     const handleEditorChange = (value: string | undefined) => {
         if (value !== undefined) {
             updateCode(value);
             if (isAllowedToEdit) {
+                // Send the new code to the server immediately
                 socket?.emit("code-update", { sessionId, code: value });
             }
         }
