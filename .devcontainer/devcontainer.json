@@ -1,0 +1,7 @@
+{
+  "name": "NestBin Dev Container",
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "app",
+  "workspaceFolder": "/workspace",
+  "shutdownAction": "stopCompose"
+}
